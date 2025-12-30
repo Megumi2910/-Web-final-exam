@@ -75,6 +75,12 @@ const CustomerLayout = () => {
       label: 'Tài khoản của tôi',
       path: '/customer/profile',
       badge: null
+    },
+    {
+      icon: Settings,
+      label: 'Cài đặt',
+      path: '/customer/settings',
+      badge: null
     }
   ];
 

@@ -58,6 +58,11 @@ public class WebSecurityConfig {
                 .requestMatchers("/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 
+                // Password reset endpoints (public - no authentication required)
+                .requestMatchers(HttpMethod.POST, "/api/user/forgot-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/user/reset-password").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/user/verify").permitAll()
+                
                 // Error endpoint (Spring Boot default error handling)
                 .requestMatchers("/error").permitAll()
                 
@@ -79,7 +84,8 @@ public class WebSecurityConfig {
                 // Seller endpoints
                 .requestMatchers("/api/seller/**").hasRole("SELLER")
                 
-                // User profile endpoints
+                // User profile endpoints (authenticated)
+                .requestMatchers("/api/user/**").authenticated()
                 .requestMatchers("/api/users/**").authenticated()
                 
                 // All other requests require authentication

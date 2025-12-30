@@ -20,5 +20,15 @@ export const userApi = {
   changePassword: (data) => {
     return api.put('/user/password', data);
   },
+
+  // Forgot password
+  forgotPassword: (email) => {
+    return api.post('/user/forgot-password', { email });
+  },
+
+  // Reset password
+  resetPassword: (token, newPassword) => {
+    return api.post('/user/reset-password', { token, newPassword });
+  },
 };
 

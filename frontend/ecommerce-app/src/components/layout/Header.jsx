@@ -320,12 +320,20 @@ const Header = () => {
                   {isUserMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       <Link
-                        to="/customer/dashboard"
+                        to="/customer/profile"
                         className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
                         <User className="w-4 h-4" />
                         <span className="text-sm">Tài khoản của tôi</span>
+                      </Link>
+                      <Link
+                        to="/customer/settings"
+                        className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span className="text-sm">Cài đặt</span>
                       </Link>
                       {hasRole('ADMIN') && (
                         <Link
@@ -400,9 +408,13 @@ const Header = () => {
               <div className="space-y-2">
                 {isAuthenticated() ? (
                   <>
-                    <Link to="/customer/dashboard" className="flex items-center space-x-2 py-2 text-white bg-orange-600 hover:bg-orange-700 px-3 rounded-lg w-full text-left font-medium">
+                    <Link to="/customer/profile" className="flex items-center space-x-2 py-2 text-white bg-orange-600 hover:bg-orange-700 px-3 rounded-lg w-full text-left font-medium">
                       <User className="w-4 h-4" />
                       <span>Tài khoản của tôi</span>
+                    </Link>
+                    <Link to="/customer/settings" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left">
+                      <Settings className="w-4 h-4" />
+                      <span>Cài đặt</span>
                     </Link>
                     <Link to="/cart" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left">
                       <ShoppingCart className="w-4 h-4" />

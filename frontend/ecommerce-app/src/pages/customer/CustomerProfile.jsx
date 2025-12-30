@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -20,6 +21,7 @@ import { orderApi } from '../../services/orderApi';
 
 const CustomerProfile = () => {
   const { user: authUser, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [activeSection, setActiveSection] = useState('personal');
   const [loading, setLoading] = useState(true);
@@ -425,7 +427,13 @@ const CustomerProfile = () => {
                         <div className="text-sm text-gray-500">Đổi mật khẩu định kỳ để bảo mật</div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Thay đổi</Button>
+                    <button 
+                      type="button"
+                      className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-transparent hover:bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+                      onClick={() => navigate('/customer/settings')}
+                    >
+                      Thay đổi
+                    </button>
                   </div>
 
                   <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-shopee-orange transition-colors">

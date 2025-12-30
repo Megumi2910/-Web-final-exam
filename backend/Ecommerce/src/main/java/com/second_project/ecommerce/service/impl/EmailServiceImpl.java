@@ -23,6 +23,11 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendVerificationEmail(String toEmail, String subject, String body) {
         try {
+            if (fromEmail == null || fromEmail.trim().isEmpty()) {
+                log.error("Email not configured: spring.mail.username is not set. Please set MAIL_USERNAME environment variable.");
+                throw new RuntimeException("Email service not configured. Please set MAIL_USERNAME and MAIL_PASSWORD environment variables.");
+            }
+            
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
@@ -30,10 +35,13 @@ public class EmailServiceImpl implements EmailService {
             message.setText(body);
 
             javaMailSender.send(message);
-            log.info("Verification email sent successfully to: {}", toEmail);
+            log.info("Email sent successfully to: {}", toEmail);
         } catch (Exception e) {
-            log.error("Failed to send verification email to: {}", toEmail, e);
-            throw new RuntimeException("Failed to send verification email", e);
+            log.error("Failed to send email to: {}. Error: {}", toEmail, e.getMessage(), e);
+            if (e.getMessage() != null && e.getMessage().contains("not configured")) {
+                throw e; // Re-throw configuration errors
+            }
+            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
         }
     }
 }

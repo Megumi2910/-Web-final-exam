@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import CategoriesPage from './pages/CategoriesPage';
 import FlashSalePage from './pages/FlashSalePage';
@@ -34,6 +36,7 @@ import {
   CustomerDashboard,
   CustomerOrders,
   CustomerProfile,
+  CustomerSettings,
   CustomerWishlist,
   ShoppingCart,
   CheckoutPage
@@ -56,6 +59,8 @@ function App() {
         <Route path="/search" element={<Layout><SearchPage /></Layout>} />
         <Route path="/login" element={<Layout><LoginPage /></Layout>} />
         <Route path="/register" element={<Layout><RegisterPage /></Layout>} />
+        <Route path="/forgot-password" element={<Layout><ForgotPasswordPage /></Layout>} />
+        <Route path="/reset-password" element={<Layout><ResetPasswordPage /></Layout>} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         
         {/* Admin routes with admin layout - Protected for ADMIN role only */}
@@ -97,6 +102,7 @@ function App() {
           <Route path="orders" element={<CustomerOrders />} />
           <Route path="wishlist" element={<CustomerWishlist />} />
           <Route path="wallet" element={<CustomerDashboard />} />
+          <Route path="settings" element={<CustomerSettings />} />
         </Route>
         
         {/* Customer profile - accessible to CUSTOMER, ADMIN, and SELLER */}

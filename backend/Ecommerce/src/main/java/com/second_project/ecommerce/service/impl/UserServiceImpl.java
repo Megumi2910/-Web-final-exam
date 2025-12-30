@@ -292,7 +292,34 @@ public class UserServiceImpl implements UserService {
         resetToken.setCreatedAt(now);
         resetPasswordTokenRepository.save(resetToken);
 
-        // TODO: Send password reset email
+        // Create reset password URL
+        String frontendBaseUrl = frontendProperties.getBaseUrl();
+        String resetPasswordUrl = frontendBaseUrl + "/reset-password?token=" + resetToken.getToken();
+
+        // Create email information
+        String toEmail = user.getEmail();
+        String subject = "Đặt lại mật khẩu - Reset Password";
+        String body = "Xin chào " + user.getFirstName() + ",\n\n"
+                    + "Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấp vào liên kết sau để đặt lại mật khẩu:\n"
+                    + "You requested to reset your password. Please click the following link to reset your password:\n\n"
+                    + resetPasswordUrl
+                    + "\n\nLiên kết sẽ hết hạn sau 1 giờ.\n"
+                    + "The link will expire in 1 hour."
+                    + "\n\nNếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n"
+                    + "If you did not request this password reset, please ignore this email."
+                    + "\n\nTrân trọng,\nBest regards,\nEcommerce Team";
+
+        // Send password reset email synchronously
+        try {
+            emailService.sendVerificationEmail(toEmail, subject, body);
+            log.info("Password reset email sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send password reset email to: {}. Error: {}", email, e.getMessage(), e);
+            log.error("Please check email configuration: MAIL_USERNAME and MAIL_PASSWORD environment variables must be set");
+            // Don't throw exception - for security, always return success even if email fails
+            // This prevents email enumeration attacks
+        }
+        
         log.info("Password reset token created for user: {}", email);
     }
 

@@ -11,8 +11,15 @@ import {
   Database,
   Palette,
   Monitor,
-  Smartphone
+  Smartphone,
+  Lock,
+  Eye,
+  EyeOff,
+  Key,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
+import { userApi } from '../../services/userApi';
 
 const SettingSection = ({ title, icon: Icon, children }) => {
   return (
@@ -52,6 +59,20 @@ const AdminSettings = () => {
     }
   });
 
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
   const handleSave = () => {
     console.log('Saving settings:', settings);
     // Here you would typically save to backend
@@ -66,6 +87,63 @@ const AdminSettings = () => {
         [field]: value
       }
     }));
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordMessage({ type: '', text: '' });
+
+    // Frontend validation
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Vui lòng điền đầy đủ thông tin' });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Mật khẩu phải khớp nhau' });
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await userApi.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công!' });
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      console.error('Error changing password:', error);
+      const errorMessage = error.response?.data?.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+      
+      // Translate backend error messages to Vietnamese
+      let translatedMessage = errorMessage;
+      if (errorMessage.toLowerCase().includes('current password is incorrect') || 
+          (errorMessage.toLowerCase().includes('current password') && 
+           errorMessage.toLowerCase().includes('incorrect'))) {
+        translatedMessage = 'Mật khẩu hiện tại không đúng';
+      } else if (errorMessage.toLowerCase().includes('new password must be different') || 
+                 (errorMessage.toLowerCase().includes('must be different') && 
+                  errorMessage.toLowerCase().includes('current password'))) {
+        translatedMessage = 'Mật khẩu mới phải khác mật khẩu hiện tại';
+      }
+      
+      setPasswordMessage({ 
+        type: 'error', 
+        text: translatedMessage
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
@@ -229,22 +307,140 @@ const AdminSettings = () => {
 
       {/* Security Settings */}
       <SettingSection title="Bảo mật" icon={Shield}>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-gray-900">Xác thực 2 yếu tố</p>
-              <p className="text-sm text-gray-500">Bảo mật tài khoản với 2FA</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.security.twoFactor}
-                onChange={(e) => handleInputChange('security', 'twoFactor', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-            </label>
+        <div className="space-y-6">
+          {/* Change Password Section */}
+          <div className="border-b border-gray-200 pb-6">
+            <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+              <Lock className="w-5 h-5 mr-2 text-orange-600" />
+              Đổi mật khẩu
+            </h4>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mật khẩu hiện tại
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
+                    placeholder="Nhập mật khẩu hiện tại"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mật khẩu mới
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
+                    placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Xác nhận mật khẩu mới
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
+                    placeholder="Nhập lại mật khẩu mới"
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {passwordMessage.text && (
+                <div className={`flex items-center space-x-2 p-3 rounded-lg ${
+                  passwordMessage.type === 'success' 
+                    ? 'bg-green-50 text-green-800 border border-green-200' 
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  {passwordMessage.type === 'success' ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5" />
+                  )}
+                  <span className="text-sm">{passwordMessage.text}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="w-full sm:w-auto px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
+              >
+                {passwordLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-4 h-4" />
+                    <span>Đổi mật khẩu</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
+
+          {/* Other Security Settings */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900">Xác thực 2 yếu tố</p>
+                <p className="text-sm text-gray-500">Bảo mật tài khoản với 2FA</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.security.twoFactor}
+                  onChange={(e) => handleInputChange('security', 'twoFactor', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+              </label>
+            </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Thời gian hết phiên (phút)</label>
@@ -271,6 +467,7 @@ const AdminSettings = () => {
               <option value="medium">Trung bình (8 ký tự, số)</option>
               <option value="strong">Mạnh (8+ ký tự, số, ký tự đặc biệt)</option>
             </select>
+          </div>
           </div>
         </div>
       </SettingSection>

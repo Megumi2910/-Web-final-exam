@@ -92,6 +92,11 @@ public class UserRestController {
             throw new IllegalArgumentException("Current password is incorrect");
         }
 
+        // Check if new password is the same as current password
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("New password must be different from current password");
+        }
+
         // Update password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userService.save(user);
