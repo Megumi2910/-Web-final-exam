@@ -99,9 +99,9 @@ function App() {
           <Route path="wallet" element={<CustomerDashboard />} />
         </Route>
         
-        {/* Customer profile - accessible to both CUSTOMER and ADMIN */}
+        {/* Customer profile - accessible to CUSTOMER, ADMIN, and SELLER */}
         <Route path="/customer/profile" element={
-          <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
+          <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN', 'SELLER']}>
             <Layout><CustomerProfile /></Layout>
           </ProtectedRoute>
         } />

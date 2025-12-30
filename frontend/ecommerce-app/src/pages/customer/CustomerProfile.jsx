@@ -3,7 +3,6 @@ import {
   User, 
   Mail, 
   Phone, 
-  Calendar, 
   Camera,
   Edit2,
   Save,
@@ -44,6 +43,7 @@ const CustomerProfile = () => {
   useEffect(() => {
     fetchProfile();
     fetchOrderStatistics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfile = async () => {

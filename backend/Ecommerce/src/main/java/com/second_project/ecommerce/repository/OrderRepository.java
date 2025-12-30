@@ -43,5 +43,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     
     @Query("SELECT COUNT(o) FROM Order o WHERE o.user.userId = :userId AND o.orderStatus = :status")
     long countByUserIdAndOrderStatus(@Param("userId") Long userId, @Param("status") OrderStatus status);
+    
+    @Query("SELECT COUNT(DISTINCT o) FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId")
+    long countOrdersBySellerId(@Param("sellerId") Long sellerId);
+    
+    @Query("SELECT COUNT(DISTINCT o.user.userId) FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId")
+    long countDistinctCustomersBySellerId(@Param("sellerId") Long sellerId);
+    
+    @Query("SELECT COALESCE(SUM(oi.price * oi.quantity), 0) FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId AND o.orderStatus = 'COMPLETED'")
+    java.math.BigDecimal calculateTotalRevenueBySellerId(@Param("sellerId") Long sellerId);
+    
+    @Query("SELECT COALESCE(SUM(oi.price * oi.quantity), 0) FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId AND o.orderStatus = 'COMPLETED' AND o.orderDate >= :startDate")
+    java.math.BigDecimal calculateMonthlyRevenueBySellerId(@Param("sellerId") Long sellerId, @Param("startDate") java.time.LocalDateTime startDate);
+    
+    @Query("SELECT DISTINCT o FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId ORDER BY o.orderDate DESC")
+    Page<Order> findRecentOrdersBySellerId(@Param("sellerId") Long sellerId, Pageable pageable);
 }
 

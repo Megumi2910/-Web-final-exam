@@ -7,11 +7,15 @@ import com.second_project.ecommerce.entity.User;
 import com.second_project.ecommerce.model.ApiResponse;
 import com.second_project.ecommerce.model.PageResponse;
 import com.second_project.ecommerce.model.ProductDto;
+import com.second_project.ecommerce.repository.OrderRepository;
+import com.second_project.ecommerce.repository.ProductRepository;
+import com.second_project.ecommerce.repository.ReviewRepository;
 import com.second_project.ecommerce.security.CustomUserDetails;
 import com.second_project.ecommerce.service.CategoryService;
 import com.second_project.ecommerce.service.OrderService;
 import com.second_project.ecommerce.service.ProductService;
 import com.second_project.ecommerce.service.UserService;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,7 +26,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/seller")
@@ -35,6 +42,9 @@ public class SellerRestController {
     private final OrderService orderService;
     private final UserService userService;
     private final CategoryService categoryService;
+    private final ProductRepository productRepository;
+    private final OrderRepository orderRepository;
+    private final ReviewRepository reviewRepository;
 
     // Product Management
     @GetMapping("/products")
@@ -222,10 +232,125 @@ public class SellerRestController {
         return ResponseEntity.ok(ApiResponse.success("Seller profile updated successfully", updatedSeller));
     }
 
-    @lombok.Data
+    @GetMapping("/statistics")
+    public ResponseEntity<ApiResponse<SellerStatistics>> getSellerStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User seller = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        SellerStatistics stats = new SellerStatistics();
+        
+        // Product count
+        stats.setTotalProducts(productRepository.countBySellerId(seller.getUserId()));
+        
+        // Order count
+        stats.setTotalOrders(orderRepository.countOrdersBySellerId(seller.getUserId()));
+        
+        // Customer count (distinct customers who ordered)
+        stats.setTotalCustomers(orderRepository.countDistinctCustomersBySellerId(seller.getUserId()));
+        
+        // Average rating
+        Double avgRating = reviewRepository.getAverageRatingBySellerId(seller.getUserId());
+        stats.setAverageRating(avgRating != null ? avgRating : 0.0);
+        
+        // Revenue
+        BigDecimal totalRevenue = orderRepository.calculateTotalRevenueBySellerId(seller.getUserId());
+        stats.setTotalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO);
+        
+        // Monthly revenue
+        LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        BigDecimal monthlyRevenue = orderRepository.calculateMonthlyRevenueBySellerId(seller.getUserId(), startOfMonth);
+        stats.setMonthlyRevenue(monthlyRevenue != null ? monthlyRevenue : BigDecimal.ZERO);
+        
+        // Recent orders (last 5)
+        Page<Order> recentOrders = orderRepository.findRecentOrdersBySellerId(seller.getUserId(), PageRequest.of(0, 5));
+        stats.setRecentOrders(recentOrders.getContent().stream()
+                .map(order -> {
+                    SellerStatistics.OrderSummary orderSummary = new SellerStatistics.OrderSummary();
+                    orderSummary.setId(order.getOrderNumber() != null ? order.getOrderNumber() : "#" + order.getId());
+                    orderSummary.setCustomerName(order.getUser().getFirstName() + " " + order.getUser().getLastName());
+                    orderSummary.setTotal(order.getTotalAmount());
+                    orderSummary.setStatus(order.getOrderStatus().name());
+                    orderSummary.setTimeAgo(calculateTimeAgo(order.getOrderDate()));
+                    return orderSummary;
+                })
+                .collect(Collectors.toList()));
+        
+        // Top products (top 5 by sales)
+        Page<Product> topProducts = productRepository.findTopSellingProductsBySellerId(seller.getUserId(), PageRequest.of(0, 5));
+        stats.setTopProducts(topProducts.getContent().stream()
+                .map(product -> {
+                    SellerStatistics.ProductSummary productSummary = new SellerStatistics.ProductSummary();
+                    productSummary.setId(product.getProductId());
+                    productSummary.setName(product.getName());
+                    productSummary.setSales(product.getSoldCount() != null ? product.getSoldCount() : 0);
+                    productSummary.setPrice(product.getPrice());
+                    Double productRating = reviewRepository.getAverageRatingByProductId(product.getProductId());
+                    productSummary.setRating(productRating != null ? productRating : 0.0);
+                    return productSummary;
+                })
+                .collect(Collectors.toList()));
+        
+        // Completion rate (completed orders / total orders)
+        long totalOrderCount = stats.getTotalOrders();
+        long completedCount = orderRepository.countByUserIdAndOrderStatus(seller.getUserId(), Order.OrderStatus.COMPLETED);
+        if (totalOrderCount > 0) {
+            stats.setCompletionRate((double) completedCount / totalOrderCount * 100);
+        } else {
+            stats.setCompletionRate(0.0);
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success("Seller statistics retrieved successfully", stats));
+    }
+    
+    private String calculateTimeAgo(LocalDateTime dateTime) {
+        if (dateTime == null) return "N/A";
+        LocalDateTime now = LocalDateTime.now();
+        long minutes = java.time.Duration.between(dateTime, now).toMinutes();
+        if (minutes < 1) return "Vừa xong";
+        if (minutes < 60) return minutes + " phút trước";
+        long hours = minutes / 60;
+        if (hours < 24) return hours + " giờ trước";
+        long days = hours / 24;
+        return days + " ngày trước";
+    }
+
+    @Data
     public static class UpdateSellerProfileRequest {
         private String storeName;
         private String storeDescription;
+    }
+    
+    @Data
+    public static class SellerStatistics {
+        private Long totalProducts;
+        private Long totalOrders;
+        private Long totalCustomers;
+        private Double averageRating;
+        private BigDecimal totalRevenue;
+        private BigDecimal monthlyRevenue;
+        private Double completionRate;
+        private List<OrderSummary> recentOrders;
+        private List<ProductSummary> topProducts;
+        
+        @Data
+        public static class OrderSummary {
+            private String id;
+            private String customerName;
+            private BigDecimal total;
+            private String status;
+            private String timeAgo;
+        }
+        
+        @Data
+        public static class ProductSummary {
+            private Long id;
+            private String name;
+            private Integer sales;
+            private BigDecimal price;
+            private Double rating;
+        }
     }
 }
 

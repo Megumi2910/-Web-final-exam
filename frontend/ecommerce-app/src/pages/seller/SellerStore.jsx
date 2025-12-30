@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Store, 
   Edit, 
   Save, 
   Upload, 
-  MapPin, 
   Phone, 
-  Mail, 
   Clock, 
   Star, 
   Users, 
   Award,
-  Globe,
   Camera,
-  Image,
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
+import { sellerApi } from '../../services/sellerApi';
+import { useAuth } from '../../context/AuthContext';
 
 const InfoCard = ({ title, icon: Icon, children }) => {
   return (
@@ -31,14 +29,15 @@ const InfoCard = ({ title, icon: Icon, children }) => {
 };
 
 const SellerStore = () => {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [storeInfo, setStoreInfo] = useState({
-    name: 'TechStore Pro',
-    description: 'Cửa hàng chuyên bán các sản phẩm công nghệ cao cấp, điện thoại, laptop, phụ kiện với giá cả hợp lý và chất lượng đảm bảo.',
-    address: '123 Đường ABC, Quận 1, TP.HCM',
-    phone: '0901234567',
-    email: 'techstore@example.com',
-    website: 'https://techstore.com',
+    name: user?.storeName || '',
+    description: user?.storeDescription || '',
+    address: user?.address || '',
+    phone: user?.phoneNumber || '',
+    email: user?.email || '',
+    website: '',
     businessHours: {
       monday: '8:00 - 22:00',
       tuesday: '8:00 - 22:00',
@@ -54,15 +53,52 @@ const SellerStore = () => {
       warrantyPolicy: 'Bảo hành chính hãng theo tiêu chuẩn nhà sản xuất'
     }
   });
-
-  const [storeStats] = useState({
-    totalProducts: 24,
-    totalOrders: 156,
-    totalCustomers: 89,
-    averageRating: 4.7,
-    responseTime: '2.5h',
-    completionRate: '94%'
+  const [loading, setLoading] = useState(true);
+  const [storeStats, setStoreStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalCustomers: 0,
+    averageRating: 0,
+    completionRate: 0
   });
+
+  useEffect(() => {
+    fetchStatistics();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      setStoreInfo(prev => ({
+        ...prev,
+        name: user.storeName || '',
+        description: user.storeDescription || '',
+        address: user.address || '',
+        phone: user.phoneNumber || '',
+        email: user.email || ''
+      }));
+    }
+  }, [user]);
+
+  const fetchStatistics = async () => {
+    try {
+      setLoading(true);
+      const response = await sellerApi.getStatistics();
+      if (response.data.success) {
+        const data = response.data.data;
+        setStoreStats({
+          totalProducts: data.totalProducts || 0,
+          totalOrders: data.totalOrders || 0,
+          totalCustomers: data.totalCustomers || 0,
+          averageRating: data.averageRating || 0,
+          completionRate: data.completionRate || 0
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch seller statistics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = () => {
     console.log('Saving store info:', storeInfo);
@@ -169,16 +205,7 @@ const SellerStore = () => {
             <Star className="w-8 h-8 text-yellow-500" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Đánh giá</p>
-              <p className="text-2xl font-bold text-gray-900">{storeStats.averageRating}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <Clock className="w-8 h-8 text-purple-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Phản hồi</p>
-              <p className="text-2xl font-bold text-gray-900">{storeStats.responseTime}</p>
+              <p className="text-2xl font-bold text-gray-900">{storeStats.averageRating.toFixed(1)}</p>
             </div>
           </div>
         </div>
@@ -187,7 +214,7 @@ const SellerStore = () => {
             <CheckCircle className="w-8 h-8 text-green-600" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Hoàn thành</p>
-              <p className="text-2xl font-bold text-gray-900">{storeStats.completionRate}</p>
+              <p className="text-2xl font-bold text-gray-900">{storeStats.completionRate.toFixed(1)}%</p>
             </div>
           </div>
         </div>

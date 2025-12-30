@@ -16,14 +16,12 @@ export const sellerApi = {
 
   // Get seller statistics
   getStatistics: () => {
-    // Note: This endpoint may need to be created in backend
-    return Promise.resolve({ data: { data: null } });
+    return api.get('/seller/statistics');
   },
 
-  // Get seller dashboard stats
+  // Get seller dashboard stats (alias for getStatistics)
   getDashboardStats: () => {
-    // Note: This endpoint may need to be created in backend
-    return Promise.resolve({ data: { data: null } });
+    return api.get('/seller/statistics');
   },
 };
 

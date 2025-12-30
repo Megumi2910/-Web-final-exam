@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   ShoppingCart, 
@@ -14,6 +14,8 @@ import {
   CheckCircle,
   BarChart3
 } from 'lucide-react';
+import { sellerApi } from '../../services/sellerApi';
+import { useAuth } from '../../context/AuthContext';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color = "blue" }) => {
   const colorClasses = {
@@ -48,32 +50,26 @@ const StatCard = ({ title, value, change, changeType, icon: Icon, color = "blue"
   );
 };
 
-const RecentOrders = () => {
-  const orders = [
-    { id: 'DH001', customer: 'Nguyễn Văn A', total: 15990000, status: 'pending', time: '2 phút trước' },
-    { id: 'DH002', customer: 'Trần Thị B', total: 29990000, status: 'confirmed', time: '15 phút trước' },
-    { id: 'DH003', customer: 'Lê Văn C', total: 8990000, status: 'shipping', time: '1 giờ trước' },
-    { id: 'DH004', customer: 'Phạm Thị D', total: 22990000, status: 'delivered', time: '2 giờ trước' },
-    { id: 'DH005', customer: 'Hoàng Văn E', total: 5990000, status: 'pending', time: '3 giờ trước' },
-  ];
-
+const RecentOrders = ({ orders = [] }) => {
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
-      case 'shipping': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'CONFIRMED': return 'bg-blue-100 text-blue-800';
+      case 'PROCESSING': return 'bg-purple-100 text-purple-800';
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Đã xác nhận';
-      case 'shipping': return 'Đang giao';
-      case 'delivered': return 'Đã giao';
-      default: return status;
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'Chờ xác nhận';
+      case 'CONFIRMED': return 'Đã xác nhận';
+      case 'PROCESSING': return 'Đang xử lý';
+      case 'COMPLETED': return 'Đã hoàn thành';
+      case 'CANCELLED': return 'Đã hủy';
+      default: return status || 'N/A';
     }
   };
 
@@ -83,38 +79,37 @@ const RecentOrders = () => {
         <h3 className="text-lg font-medium text-gray-900">Đơn hàng gần đây</h3>
       </div>
       <div className="divide-y divide-gray-200">
-        {orders.map((order) => (
-          <div key={order.id} className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">#{order.id}</p>
-                  <p className="text-sm text-gray-500">{order.customer}</p>
+        {orders.length > 0 ? (
+          orders.map((order) => (
+            <div key={order.id} className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{order.id}</p>
+                    <p className="text-sm text-gray-500">{order.customerName}</p>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-900">{Number(order.total).toLocaleString('vi-VN')}₫</p>
+                    <p className="text-xs text-gray-500">{order.timeAgo}</p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-900">{order.total.toLocaleString()}đ</p>
-                  <p className="text-xs text-gray-500">{order.time}</p>
-                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                  {getStatusText(order.status)}
+                </span>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                {getStatusText(order.status)}
-              </span>
             </div>
+          ))
+        ) : (
+          <div className="px-6 py-4 text-center text-gray-500">
+            <p>Chưa có đơn hàng nào</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 };
 
-const TopProducts = () => {
-  const products = [
-    { id: 1, name: 'iPhone 15 Pro Max', sales: 45, revenue: '1,350,000', rating: 4.8 },
-    { id: 2, name: 'Samsung Galaxy S24', sales: 32, revenue: '896,000', rating: 4.7 },
-    { id: 3, name: 'MacBook Air M2', sales: 18, revenue: '414,000', rating: 4.9 },
-    { id: 4, name: 'iPad Pro 12.9', sales: 15, revenue: '300,000', rating: 4.5 },
-    { id: 5, name: 'AirPods Pro 2', sales: 28, revenue: '168,000', rating: 4.8 },
-  ];
+const TopProducts = ({ products = [] }) => {
 
   return (
     <div className="bg-white rounded-lg shadow">
@@ -122,37 +117,41 @@ const TopProducts = () => {
         <h3 className="text-lg font-medium text-gray-900">Sản phẩm bán chạy</h3>
       </div>
       <div className="divide-y divide-gray-200">
-        {products.map((product, index) => (
-          <div key={product.id} className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <span className="text-sm font-medium text-gray-500 mr-3">#{index + 1}</span>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{product.name}</p>
-                  <div className="flex items-center mt-1">
-                    <Star className="w-3 h-3 text-yellow-400 mr-1" />
-                    <span className="text-xs text-gray-500">{product.rating}</span>
+        {products.length > 0 ? (
+          products.map((product, index) => (
+            <div key={product.id} className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-500 mr-3">#{index + 1}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{product.name}</p>
+                    <div className="flex items-center mt-1">
+                      <Star className="w-3 h-3 text-yellow-400 mr-1" />
+                      <span className="text-xs text-gray-500">{product.rating?.toFixed(1) || '0.0'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{product.sales} bán</p>
-                <p className="text-xs text-gray-500">{product.revenue}đ</p>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">{product.sales || 0} bán</p>
+                  <p className="text-xs text-gray-500">{Number(product.price).toLocaleString('vi-VN')}₫</p>
+                </div>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="px-6 py-4 text-center text-gray-500">
+            <p>Chưa có sản phẩm nào</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 };
 
-const StorePerformance = () => {
+const StorePerformance = ({ averageRating = 0, completionRate = 0 }) => {
   const metrics = [
-    { label: 'Tỷ lệ chuyển đổi', value: '3.2%', change: '+0.5%', changeType: 'up' },
-    { label: 'Thời gian phản hồi', value: '2.5h', change: '-0.3h', changeType: 'up' },
-    { label: 'Đánh giá trung bình', value: '4.7', change: '+0.1', changeType: 'up' },
-    { label: 'Tỷ lệ hoàn trả', value: '2.1%', change: '-0.2%', changeType: 'up' },
+    { label: 'Tỷ lệ hoàn thành', value: `${completionRate.toFixed(1)}%`, change: '', changeType: 'up' },
+    { label: 'Đánh giá trung bình', value: averageRating.toFixed(1), change: '', changeType: 'up' },
   ];
 
   return (
@@ -163,16 +162,18 @@ const StorePerformance = () => {
           <div key={index} className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
             <p className="text-sm text-gray-500">{metric.label}</p>
-            <div className="flex items-center justify-center mt-1">
-              {metric.changeType === 'up' ? (
-                <ArrowUpRight className="w-3 h-3 text-green-500 mr-1" />
-              ) : (
-                <ArrowDownRight className="w-3 h-3 text-red-500 mr-1" />
-              )}
-              <span className={`text-xs ${metric.changeType === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                {metric.change}
-              </span>
-            </div>
+            {metric.change && (
+              <div className="flex items-center justify-center mt-1">
+                {metric.changeType === 'up' ? (
+                  <ArrowUpRight className="w-3 h-3 text-green-500 mr-1" />
+                ) : (
+                  <ArrowDownRight className="w-3 h-3 text-red-500 mr-1" />
+                )}
+                <span className={`text-xs ${metric.changeType === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                  {metric.change}
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -181,6 +182,58 @@ const StorePerformance = () => {
 };
 
 const SellerDashboard = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalCustomers: 0,
+    averageRating: 0,
+    monthlyRevenue: 0,
+    completionRate: 0,
+    recentOrders: [],
+    topProducts: []
+  });
+
+  useEffect(() => {
+    fetchStatistics();
+  }, []);
+
+  const fetchStatistics = async () => {
+    try {
+      setLoading(true);
+      const response = await sellerApi.getStatistics();
+      if (response.data.success) {
+        const data = response.data.data;
+        setStats({
+          totalProducts: data.totalProducts || 0,
+          totalOrders: data.totalOrders || 0,
+          totalCustomers: data.totalCustomers || 0,
+          averageRating: data.averageRating || 0,
+          monthlyRevenue: data.monthlyRevenue || 0,
+          completionRate: data.completionRate || 0,
+          recentOrders: data.recentOrders || [],
+          topProducts: data.topProducts || []
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch seller statistics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải thống kê...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -193,32 +246,32 @@ const SellerDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Doanh thu tháng này"
-          value="45,230,000đ"
-          change="+12.5%"
+          value={`${Number(stats.monthlyRevenue).toLocaleString('vi-VN')}₫`}
+          change=""
           changeType="up"
           icon={DollarSign}
           color="green"
         />
         <StatCard
           title="Đơn hàng"
-          value="156"
-          change="+8.2%"
+          value={stats.totalOrders.toString()}
+          change=""
           changeType="up"
           icon={ShoppingCart}
           color="blue"
         />
         <StatCard
           title="Sản phẩm"
-          value="24"
-          change="+3.1%"
+          value={stats.totalProducts.toString()}
+          change=""
           changeType="up"
           icon={Package}
           color="orange"
         />
         <StatCard
           title="Đánh giá trung bình"
-          value="4.7"
-          change="+0.2"
+          value={stats.averageRating.toFixed(1)}
+          change=""
           changeType="up"
           icon={Star}
           color="purple"
@@ -234,13 +287,16 @@ const SellerDashboard = () => {
           </div>
         </div>
 
-        <StorePerformance />
+        <StorePerformance 
+          averageRating={stats.averageRating}
+          completionRate={stats.completionRate}
+        />
       </div>
 
       {/* Recent Orders and Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentOrders />
-        <TopProducts />
+        <RecentOrders orders={stats.recentOrders} />
+        <TopProducts products={stats.topProducts} />
       </div>
 
       {/* Quick Actions */}
