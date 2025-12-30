@@ -17,7 +17,7 @@ const VerificationBanner = ({ user }) => {
       if (response.data.success) {
         setMessage({
           type: 'success',
-          text: 'Email xác thực đã được gửi! Vui lòng kiểm tra hộp thư của bạn.'
+          text: 'Email xác thực đã được gửi thành công! Vui lòng kiểm tra hộp thư của bạn (bao gồm cả thư mục spam).'
         });
       } else {
         setMessage({
@@ -27,9 +27,23 @@ const VerificationBanner = ({ user }) => {
       }
     } catch (error) {
       console.error('Error sending verification email:', error);
+      
+      // Extract error message from response
+      let errorMessage = 'Không thể gửi email xác thực. Vui lòng thử lại sau.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Lỗi hệ thống. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
+      } else if (error.message === 'Network Error') {
+        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+      }
+      
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Không thể gửi email xác thực. Vui lòng thử lại sau.'
+        text: errorMessage
       });
     } finally {
       setLoading(false);

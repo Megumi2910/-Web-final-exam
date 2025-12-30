@@ -69,7 +69,7 @@ const LoginPage = () => {
         } else if (user?.role === 'SELLER') {
           navigate('/seller');
         } else {
-          navigate('/customer/dashboard');
+          navigate('/');
         }
       } else {
         setApiError(result.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
