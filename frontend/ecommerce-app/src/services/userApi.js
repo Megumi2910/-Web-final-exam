@@ -6,14 +6,19 @@ export const userApi = {
     return api.get(`/users/${id}`);
   },
 
+  // Get current user profile
+  getProfile: () => {
+    return api.get('/user/profile');
+  },
+
   // Update profile
   updateProfile: (data) => {
-    return api.put('/users/profile', data);
+    return api.put('/user/profile', data);
   },
 
   // Change password
   changePassword: (data) => {
-    return api.put('/users/change-password', data);
+    return api.put('/user/password', data);
   },
 };
 

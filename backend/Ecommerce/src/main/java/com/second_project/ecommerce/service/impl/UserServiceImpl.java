@@ -1,5 +1,6 @@
 package com.second_project.ecommerce.service.impl;
 
+import com.second_project.ecommerce.config.properties.FrontendProperties;
 import com.second_project.ecommerce.config.properties.TokenProperties;
 import com.second_project.ecommerce.entity.User;
 import com.second_project.ecommerce.entity.VerificationToken;
@@ -13,6 +14,7 @@ import com.second_project.ecommerce.repository.UserRepository;
 import com.second_project.ecommerce.repository.VerificationTokenRepository;
 import com.second_project.ecommerce.repository.ResetPasswordTokenRepository;
 import com.second_project.ecommerce.security.JwtTokenProvider;
+import com.second_project.ecommerce.service.EmailService;
 import com.second_project.ecommerce.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -43,6 +47,8 @@ public class UserServiceImpl implements UserService {
     private final AuthenticationManager authenticationManager;
     private final ApplicationEventPublisher eventPublisher;
     private final TokenProperties tokenProperties;
+    private final EmailService emailService;
+    private final FrontendProperties frontendProperties;
     
     // GMT+7 timezone for consistent date/time handling
     private static final ZoneId GMT_PLUS_7 = ZoneId.of("GMT+7");
@@ -207,6 +213,69 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public void resendVerificationEmailSynchronously(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + email));
+        
+        // Check if user is already verified
+        if (user.getIsVerified()) {
+            throw new IllegalArgumentException("User is already verified!");
+        }
+        
+        // Rate limiting: Check if email was sent recently
+        LocalDateTime now = LocalDateTime.now(GMT_PLUS_7);
+        if (user.getLastVerificationEmailSent() != null) {
+            long secondsSinceLastEmail = ChronoUnit.SECONDS.between(
+                user.getLastVerificationEmailSent(), now);
+            
+            long rateLimitSeconds = tokenProperties.getRateLimitSeconds();
+            if (secondsSinceLastEmail < rateLimitSeconds) {
+                long secondsRemaining = rateLimitSeconds - secondsSinceLastEmail;
+                throw new IllegalArgumentException(
+                    "Please wait before requesting another verification email. Try again in " 
+                    + secondsRemaining + " seconds.");
+            }
+        }
+        
+        // Delete existing verification tokens for this user
+        verificationTokenRepository.deleteByUser(user.getUserId());
+        
+        // Create new verification token
+        VerificationToken token = new VerificationToken();
+        token.setToken(UUID.randomUUID().toString());
+        token.setUser(user);
+        token.setExpiryDate(now.plusMinutes(tokenProperties.getVerificationDurationMinutes()));
+        token.setCreatedAt(now);
+        verificationTokenRepository.save(token);
+        
+        // Update last sent timestamp
+        user.setLastVerificationEmailSent(now);
+        userRepository.save(user);
+        
+        // Create verification URL using configured frontend base URL
+        String frontendBaseUrl = frontendProperties.getBaseUrl();
+        String verificationUrl = frontendBaseUrl + "/verify-email?token=" + token.getToken();
+
+        // Create email information
+        String toEmail = user.getEmail();
+        String subject = "Xác thực tài khoản - Verify Account";
+        String body = "Xin chào " + user.getFirstName() + ",\n\n"
+                    + "Cảm ơn bạn đã đăng ký! Vui lòng nhấp vào liên kết sau để xác thực tài khoản của bạn:\n"
+                    + "Thank you for registering! Please click the following link to verify your account:\n\n"
+                    + verificationUrl
+                    + "\n\nLiên kết sẽ hết hạn sau " + tokenProperties.getVerificationDurationMinutes() + " phút.\n"
+                    + "The link will expire in " + tokenProperties.getVerificationDurationMinutes() + " minutes."
+                    + "\n\nNếu bạn không tạo tài khoản này, vui lòng bỏ qua email này.\n"
+                    + "If you did not create this account, please ignore this email."
+                    + "\n\nTrân trọng,\nBest regards,\nEcommerce Team";
+
+        // Send verification email synchronously - this will throw exception if it fails
+        emailService.sendVerificationEmail(toEmail, subject, body);
+        log.info("Verification email sent synchronously to: {}", email);
+    }
+
+    @Override
     public void createPasswordResetToken(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -244,6 +313,19 @@ public class UserServiceImpl implements UserService {
 
         resetPasswordTokenRepository.delete(resetToken);
         log.info("Password reset successfully for user: {}", user.getEmail());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> getAllUsers(Pageable pageable, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return userRepository.findAll(pageable);
+        }
+
+        String trimmed = keyword.trim();
+        return userRepository
+                .findByEmailContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+                        trimmed, trimmed, trimmed, pageable);
     }
 
     private UserInfo mapToUserInfo(User user) {

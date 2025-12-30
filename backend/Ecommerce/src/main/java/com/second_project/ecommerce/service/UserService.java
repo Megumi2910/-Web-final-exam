@@ -5,6 +5,9 @@ import com.second_project.ecommerce.model.auth.AuthResponse;
 import com.second_project.ecommerce.model.auth.LoginRequest;
 import com.second_project.ecommerce.model.auth.RegisterRequest;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.Optional;
 
 public interface UserService {
@@ -16,7 +19,18 @@ public interface UserService {
     User save(User user);
     void verifyUser(String token);
     void requestVerificationEmail(String email);
+    void resendVerificationEmailSynchronously(String email);
     void createPasswordResetToken(String email);
     void resetPassword(String token, String newPassword);
+    
+    /**
+     * Get all users with optional keyword search.
+     * Used for admin user management.
+     * 
+     * @param pageable Pagination information
+     * @param keyword Optional search keyword (searches email, first name, last name)
+     * @return Page of users
+     */
+    Page<User> getAllUsers(Pageable pageable, String keyword);
 }
 

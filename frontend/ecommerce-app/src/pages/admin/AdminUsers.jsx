@@ -10,8 +10,11 @@ import {
   UserPlus,
   UserCheck,
   UserX,
-  Shield,
-  Crown
+  Store,
+  Crown,
+  X,
+  BadgeCheck,
+  XCircle
 } from 'lucide-react';
 
 // Helper functions moved outside component to be accessible everywhere
@@ -35,8 +38,220 @@ const getRoleText = (roles) => {
 const getRoleIcon = (roles) => {
   if (!roles || roles.length === 0) return Users;
   if (roles.includes('ADMIN')) return Crown;
-  if (roles.includes('SELLER')) return Shield;
+  if (roles.includes('SELLER')) return Store;
   return Users;
+};
+
+// Edit User Modal Component
+const EditUserModal = ({ user, onClose, onSave, saving }) => {
+  const [formData, setFormData] = useState({
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    phoneNumber: user.phoneNumber || '',
+    address: user.address || '',
+    role: user.roles?.[0] || 'CUSTOMER',
+    enabled: user.enabled !== false,
+    storeName: user.storeName || '',
+    storeDescription: user.storeDescription || '',
+    isSellerApproved: user.isSellerApproved || false
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await onSave(formData);
+    } catch (err) {
+      // Error is handled in parent component
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Chỉnh sửa người dùng</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Họ
+              </label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên
+              </label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={user.email}
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Email không thể thay đổi</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Số điện thoại
+            </label>
+            <input
+              type="text"
+              name="phoneNumber"
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Địa chỉ
+            </label>
+            <textarea
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Vai trò
+              </label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="CUSTOMER">Khách hàng</option>
+                <option value="SELLER">Người bán</option>
+                <option value="ADMIN">Quản trị viên</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trạng thái
+              </label>
+              <select
+                name="enabled"
+                value={formData.enabled ? 'true' : 'false'}
+                onChange={(e) => setFormData(prev => ({ ...prev, enabled: e.target.value === 'true' }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="true">Hoạt động</option>
+                <option value="false">Bị khóa</option>
+              </select>
+            </div>
+          </div>
+
+          {formData.role === 'SELLER' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tên cửa hàng
+                </label>
+                <input
+                  type="text"
+                  name="storeName"
+                  value={formData.storeName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mô tả cửa hàng
+                </label>
+                <textarea
+                  name="storeDescription"
+                  value={formData.storeDescription}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="isSellerApproved"
+                    checked={formData.isSellerApproved}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Đã được phê duyệt</span>
+                </label>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center space-x-2"
+            >
+              {saving && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              )}
+              <span>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 const UserCard = ({ user, onView, onEdit, onDelete }) => {
@@ -49,7 +264,11 @@ const UserCard = ({ user, onView, onEdit, onDelete }) => {
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center">
             <span className="text-white font-bold text-lg">
-              {user.name.charAt(0).toUpperCase()}
+              {(() => {
+                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+                const displayName = fullName || user.email || 'U';
+                return displayName.charAt(0).toUpperCase();
+              })()}
             </span>
           </div>
           <div>
@@ -88,6 +307,29 @@ const UserCard = ({ user, onView, onEdit, onDelete }) => {
           </span>
         </div>
 
+        {user.roles?.includes('SELLER') && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Xác minh:</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${
+              user.isSellerApproved
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+              {user.isSellerApproved ? (
+                <>
+                  <BadgeCheck className="w-3 h-3" />
+                  <span>Đã xác minh</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-3 h-3" />
+                  <span>Chưa xác minh</span>
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Trạng thái:</span>
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -122,44 +364,45 @@ const AdminUsers = () => {
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, searchQuery]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await adminApi.getAllUsers(page, 20);
-      const data = response.data.data;
-      setUsers(data.content || []);
-      setTotalPages(data.totalPages || 0);
+      const response = await adminApi.getAllUsers(page, 20, searchQuery);
+      console.log('Users API response:', response.data); // Debugging log
+      if (response.data.success) {
+        // PageResponse structure: data.data is the list, pagination fields are at response.data level
+        const usersList = response.data.data || [];
+        setUsers(usersList);
+        setTotalPages(response.data.totalPages || 0);
+      } else {
+        setError(response.data.message || 'Failed to fetch users');
+        setUsers([]);
+      }
     } catch (err) {
       console.error('Failed to fetch users:', err);
-      // If endpoint doesn't exist, show empty state
-      if (err.response?.status === 404) {
-        setError('Tính năng này chưa được triển khai. Vui lòng thêm endpoint GET /api/users vào backend.');
-      } else {
-        setError('Không thể tải danh sách người dùng');
-      }
+      setError(err.response?.data?.message || 'Không thể tải danh sách người dùng');
       setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Client-side filtering for role and status (search is done server-side)
   const filteredUsers = users.filter(user => {
-    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-    const matchesSearch = fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.phoneNumber?.includes(searchQuery);
     const matchesRole = filterRole === 'all' || 
                        (filterRole === 'admin' && user.roles?.includes('ADMIN')) ||
                        (filterRole === 'seller' && user.roles?.includes('SELLER')) ||
@@ -167,7 +410,7 @@ const AdminUsers = () => {
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && user.enabled !== false) ||
                          (filterStatus === 'inactive' && user.enabled === false);
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesRole && matchesStatus;
   });
 
   const handleView = (user) => {
@@ -175,11 +418,32 @@ const AdminUsers = () => {
   };
 
   const handleEdit = (user) => {
-    console.log('Edit user:', user);
+    setEditingUser({ ...user });
+  };
+
+  const handleSave = async (userData) => {
+    try {
+      setSaving(true);
+      await adminApi.updateUser(editingUser.id, userData);
+      await fetchUsers(); // Refresh the list
+      setEditingUser(null);
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      alert(err.response?.data?.message || 'Không thể cập nhật người dùng');
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingUser(null);
   };
 
   const handleDelete = (user) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${user.name}"?`)) {
+    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    const displayName = fullName || user.email || 'người dùng này';
+    if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${displayName}"?`)) {
       console.log('Delete user:', user);
     }
   };
@@ -189,7 +453,7 @@ const AdminUsers = () => {
     active: users.filter(u => u.enabled !== false).length,
     inactive: users.filter(u => u.enabled === false).length,
     customers: users.filter(u => u.roles?.includes('CUSTOMER')).length,
-    sellers: users.filter(u => u.roles?.includes('SELLER')).length,
+    sellers: users.filter(u => u.roles?.includes('SELLER') && u.isSellerApproved === true).length,
     admins: users.filter(u => u.roles?.includes('ADMIN')).length
   };
 
@@ -247,7 +511,7 @@ const AdminUsers = () => {
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
-            <Shield className="w-8 h-8 text-blue-600" />
+            <Store className="w-8 h-8 text-blue-600" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Người bán</p>
               <p className="text-2xl font-bold text-gray-900">{stats.sellers}</p>
@@ -432,12 +696,28 @@ const AdminUsers = () => {
               >
                 Đóng
               </button>
-              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+              <button 
+                onClick={() => {
+                  setSelectedUser(null);
+                  handleEdit(selectedUser);
+                }}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+              >
                 Chỉnh sửa
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          onClose={handleCloseEditModal}
+          onSave={handleSave}
+          saving={saving}
+        />
       )}
     </div>
   );

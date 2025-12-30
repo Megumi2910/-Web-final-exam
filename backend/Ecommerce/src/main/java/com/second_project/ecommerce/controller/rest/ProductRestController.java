@@ -3,6 +3,7 @@ package com.second_project.ecommerce.controller.rest;
 import com.second_project.ecommerce.entity.Product;
 import com.second_project.ecommerce.model.ApiResponse;
 import com.second_project.ecommerce.model.PageResponse;
+import com.second_project.ecommerce.model.ProductDto;
 import com.second_project.ecommerce.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,7 @@ public class ProductRestController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<PageResponse<Product>> getAllProducts(
+    public ResponseEntity<PageResponse<ProductDto>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -35,7 +36,7 @@ public class ProductRestController {
                 Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        Page<Product> productPage = productService.findByStatus(Product.ProductStatus.APPROVED, pageable);
+        Page<ProductDto> productPage = productService.findByStatusDtos(Product.ProductStatus.APPROVED, pageable);
 
         return ResponseEntity.ok(PageResponse.success(
                 "Products retrieved successfully",
@@ -48,13 +49,13 @@ public class ProductRestController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<PageResponse<Product>> searchProducts(
+    public ResponseEntity<PageResponse<ProductDto>> searchProducts(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Product> productPage = productService.searchProducts(keyword, pageable);
+        Page<ProductDto> productPage = productService.searchProductsDtos(keyword, pageable);
 
         return ResponseEntity.ok(PageResponse.success(
                 "Search results retrieved successfully",
@@ -67,28 +68,28 @@ public class ProductRestController {
     }
 
     @GetMapping("/featured")
-    public ResponseEntity<ApiResponse<List<Product>>> getFeaturedProducts() {
-        List<Product> products = productService.findFeaturedProducts();
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getFeaturedProducts() {
+        List<ProductDto> products = productService.findFeaturedProductsDtos();
         return ResponseEntity.ok(ApiResponse.success("Featured products retrieved successfully", products));
     }
 
     @GetMapping("/new")
-    public ResponseEntity<ApiResponse<List<Product>>> getNewProducts() {
-        List<Product> products = productService.findNewProducts();
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getNewProducts() {
+        List<ProductDto> products = productService.findNewProductsDtos();
         return ResponseEntity.ok(ApiResponse.success("New products retrieved successfully", products));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Product>> getProductById(@PathVariable Long id) {
-        Product product = productService.findById(id)
+    public ResponseEntity<ApiResponse<ProductDto>> getProductById(@PathVariable Long id) {
+        ProductDto product = productService.findDtoById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
         return ResponseEntity.ok(ApiResponse.success("Product retrieved successfully", product));
     }
 
     @GetMapping("/slug/{slug}")
-    public ResponseEntity<ApiResponse<Product>> getProductBySlug(@PathVariable String slug) {
-        Product product = productService.findBySlug(slug)
+    public ResponseEntity<ApiResponse<ProductDto>> getProductBySlug(@PathVariable String slug) {
+        ProductDto product = productService.findDtoBySlug(slug)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
         return ResponseEntity.ok(ApiResponse.success("Product retrieved successfully", product));
@@ -96,18 +97,18 @@ public class ProductRestController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Product>> createProduct(@RequestBody Product product) {
-        Product savedProduct = productService.save(product);
+    public ResponseEntity<ApiResponse<ProductDto>> createProduct(@RequestBody ProductDto productDto) {
+        ProductDto savedProduct = productService.saveDto(productDto);
         return ResponseEntity.ok(ApiResponse.success("Product created successfully", savedProduct));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Product>> updateProduct(
+    public ResponseEntity<ApiResponse<ProductDto>> updateProduct(
             @PathVariable Long id,
-            @RequestBody Product productDetails) {
+            @RequestBody ProductDto productDetails) {
 
-        Product updatedProduct = productService.update(id, productDetails);
+        ProductDto updatedProduct = productService.updateDto(id, productDetails);
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updatedProduct));
     }
 

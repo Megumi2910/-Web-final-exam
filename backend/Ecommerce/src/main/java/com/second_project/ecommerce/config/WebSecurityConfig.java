@@ -58,6 +58,9 @@ public class WebSecurityConfig {
                 .requestMatchers("/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 
+                // Error endpoint (Spring Boot default error handling)
+                .requestMatchers("/error").permitAll()
+                
                 // Actuator endpoints
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
@@ -67,7 +70,7 @@ public class WebSecurityConfig {
                 
                 // Order endpoints - authenticated users
                 .requestMatchers("/api/orders/my-orders").authenticated()
-                .requestMatchers("/api/orders/**/cancel").authenticated()
+                .requestMatchers("/api/orders/*/cancel").authenticated() // Single * instead of **
                 .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
                 
                 // Admin endpoints

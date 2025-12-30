@@ -122,6 +122,17 @@ public class OrderRestController {
         return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", order));
     }
 
+    @GetMapping("/statistics")
+    public ResponseEntity<ApiResponse<OrderService.OrderStatistics>> getOrderStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User user = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        OrderService.OrderStatistics stats = orderService.getUserOrderStatistics(user);
+        return ResponseEntity.ok(ApiResponse.success("Order statistics retrieved successfully", stats));
+    }
+
     @Data
     public static class CreateOrderRequest {
         private String shippingAddress;

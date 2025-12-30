@@ -164,6 +164,18 @@ public class OrderServiceImpl implements OrderService {
     public List<Order> findOrdersBySeller(User seller) {
         return orderRepository.findOrdersBySeller(seller);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderService.OrderStatistics getUserOrderStatistics(User user) {
+        OrderService.OrderStatistics stats = new OrderService.OrderStatistics();
+        stats.setTotalCount(orderRepository.countByUserId(user.getUserId()));
+        stats.setPendingCount(orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.PENDING));
+        stats.setShippingCount(orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.PROCESSING));
+        stats.setCompletedCount(orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.COMPLETED));
+        stats.setCancelledCount(orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.CANCELLED));
+        return stats;
+    }
 }
 
 

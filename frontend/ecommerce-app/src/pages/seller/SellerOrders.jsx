@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
@@ -16,6 +16,7 @@ import {
   Star,
   MessageSquare
 } from 'lucide-react';
+import { orderApi } from '../../services/orderApi';
 
 const OrderCard = ({ order, onView, onEdit }) => {
   const getStatusColor = (status) => {
@@ -143,76 +144,69 @@ const SellerOrders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - chỉ đơn hàng của sản phẩm seller hiện tại
-  const orders = [
-    {
-      id: 'DH001',
-      customer: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '123 Đường ABC, Quận 1, TP.HCM',
-      items: 2,
-      total: 35980000,
-      status: 'pending',
-      note: 'Giao hàng vào buổi chiều',
-      createdAt: '2024-01-15 14:30'
-    },
-    {
-      id: 'DH002',
-      customer: 'Trần Thị B',
-      phone: '0907654321',
-      address: '456 Đường XYZ, Quận 2, TP.HCM',
-      items: 1,
-      total: 27990000,
-      status: 'confirmed',
-      note: null,
-      createdAt: '2024-01-15 13:45'
-    },
-    {
-      id: 'DH003',
-      customer: 'Lê Văn C',
-      phone: '0909876543',
-      address: '789 Đường DEF, Quận 3, TP.HCM',
-      items: 1,
-      total: 5990000,
-      status: 'shipping',
-      note: 'Giao hàng nhanh',
-      createdAt: '2024-01-15 12:20'
-    },
-    {
-      id: 'DH004',
-      customer: 'Phạm Thị D',
-      phone: '0904567890',
-      address: '321 Đường GHI, Quận 4, TP.HCM',
-      items: 3,
-      total: 50980000,
-      status: 'delivered',
-      note: null,
-      createdAt: '2024-01-14 16:15'
-    },
-    {
-      id: 'DH005',
-      customer: 'Hoàng Văn E',
-      phone: '0902345678',
-      address: '654 Đường JKL, Quận 5, TP.HCM',
-      items: 1,
-      total: 15990000,
-      status: 'cancelled',
-      note: 'Khách hàng hủy đơn',
-      createdAt: '2024-01-14 10:30'
-    },
-    {
-      id: 'DH006',
-      customer: 'Võ Thị F',
-      phone: '0908765432',
-      address: '987 Đường MNO, Quận 6, TP.HCM',
-      items: 2,
-      total: 24980000,
-      status: 'pending',
-      note: 'Giao hàng vào cuối tuần',
-      createdAt: '2024-01-14 09:45'
-    }
-  ];
+  // Fetch orders from API
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await orderApi.getMyOrders(0, 100);
+        
+        if (response.data.success) {
+          const mappedOrders = (response.data.data || []).map(order => {
+            // Map backend OrderStatus to frontend status strings
+            let status = 'pending';
+            if (order.orderStatus) {
+              const orderStatus = order.orderStatus.toLowerCase();
+              if (orderStatus === 'confirmed') status = 'confirmed';
+              else if (orderStatus === 'processing' || order.deliveryStatus === 'SHIPPED') status = 'shipping';
+              else if (orderStatus === 'completed' || order.deliveryStatus === 'DELIVERED') status = 'delivered';
+              else if (orderStatus === 'cancelled') status = 'cancelled';
+            }
+
+            // Format date
+            const createdAt = order.createdAt 
+              ? new Date(order.createdAt).toLocaleString('vi-VN', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : '';
+
+            return {
+              id: order.orderNumber || order.id?.toString() || `DH${order.id}`,
+              customer: order.user?.fullName || order.user?.email || 'Khách hàng',
+              phone: order.phoneNumber || order.shippingPhone || '',
+              address: order.shippingAddress || '',
+              items: order.items?.length || 0,
+              total: order.totalAmount ? parseFloat(order.totalAmount) : 0,
+              status: status,
+              note: order.notes || null,
+              createdAt: createdAt,
+              orderId: order.id // Keep original ID for API calls
+            };
+          });
+          setOrders(mappedOrders);
+        } else {
+          setError(response.data.message || 'Failed to fetch orders');
+        }
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+        setError(err.response?.data?.message || 'Failed to load orders');
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -343,22 +337,37 @@ const SellerOrders = () => {
       </div>
 
       {/* Orders Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredOrders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            onView={handleView}
-            onEdit={handleEdit}
-          />
-        ))}
-      </div>
-
-      {filteredOrders.length === 0 && (
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải đơn hàng...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <div className="text-red-400 text-6xl mb-4">⚠</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Lỗi khi tải dữ liệu</h3>
+          <p className="text-gray-500">{error}</p>
+        </div>
+      ) : filteredOrders.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              onView={handleView}
+              onEdit={handleEdit}
+            />
+          ))}
+        </div>
+      ) : (
         <div className="text-center py-12">
           <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Không tìm thấy đơn hàng</h3>
-          <p className="text-gray-500">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+          <p className="text-gray-500">
+            {searchQuery || filterStatus !== 'all' 
+              ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+              : 'Chưa có đơn hàng nào'}
+          </p>
         </div>
       )}
 

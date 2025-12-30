@@ -12,12 +12,16 @@ import {
   X,
   LogOut,
   Bell,
-  Search
+  Search,
+  Folder,
+  User,
+  ChevronDown
 } from 'lucide-react';
 import VerificationBanner from '../../components/VerificationBanner';
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user, isAuthenticated, isVerified } = useAuth();
@@ -28,6 +32,7 @@ const AdminLayout = () => {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Sản phẩm', href: '/admin/products', icon: Package },
+    { name: 'Danh mục', href: '/admin/categories', icon: Folder },
     { name: 'Đơn hàng', href: '/admin/orders', icon: ShoppingCart },
     { name: 'Người dùng', href: '/admin/users', icon: Users },
     { name: 'Thống kê', href: '/admin/analytics', icon: BarChart3 },
@@ -155,19 +160,73 @@ const AdminLayout = () => {
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400"></span>
               </button>
 
-              {/* User menu */}
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {user?.firstName?.charAt(0).toUpperCase() || 'A'}
-                  </span>
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.firstName} {user?.lastName}
-                  </p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
-                </div>
+              {/* Profile Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {user?.firstName?.charAt(0).toUpperCase() || 'A'}
+                    </span>
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </button>
+
+                {showProfileMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="p-4 border-b border-gray-200">
+                        <div className="font-medium text-gray-900">
+                          {user?.firstName} {user?.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">{user?.email}</div>
+                      </div>
+                      <div className="py-2">
+                        <Link
+                          to="/customer/profile"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <User className="w-4 h-4 mr-3" />
+                          Hồ sơ của tôi
+                        </Link>
+                        <Link
+                          to="/admin/settings"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <Settings className="w-4 h-4 mr-3" />
+                          Cài đặt
+                        </Link>
+                      </div>
+                      <div className="border-t border-gray-200 py-2">
+                        <button
+                          onClick={async () => {
+                            setShowProfileMenu(false);
+                            await logout();
+                            navigate('/');
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <LogOut className="w-4 h-4 mr-3" />
+                          Đăng xuất
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

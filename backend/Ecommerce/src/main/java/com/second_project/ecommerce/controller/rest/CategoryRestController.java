@@ -1,8 +1,9 @@
 package com.second_project.ecommerce.controller.rest;
 
-import com.second_project.ecommerce.entity.Category;
 import com.second_project.ecommerce.model.ApiResponse;
+import com.second_project.ecommerce.model.CategoryDto;
 import com.second_project.ecommerce.service.CategoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -20,48 +21,44 @@ public class CategoryRestController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Category>>> getAllCategories() {
-        List<Category> categories = categoryService.findActiveCategories();
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
+        List<CategoryDto> categories = categoryService.findActiveCategoriesDtos();
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
     }
 
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<Category>>> getAllCategoriesAdmin() {
-        List<Category> categories = categoryService.findAll();
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategoriesAdmin() {
+        List<CategoryDto> categories = categoryService.findAllDtos();
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Category>> getCategoryById(@PathVariable Long id) {
-        Category category = categoryService.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
-
+    public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable Long id) {
+        CategoryDto category = categoryService.findDtoById(id);
         return ResponseEntity.ok(ApiResponse.success("Category retrieved successfully", category));
     }
 
     @GetMapping("/slug/{slug}")
-    public ResponseEntity<ApiResponse<Category>> getCategoryBySlug(@PathVariable String slug) {
-        Category category = categoryService.findBySlug(slug)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
-
+    public ResponseEntity<ApiResponse<CategoryDto>> getCategoryBySlug(@PathVariable String slug) {
+        CategoryDto category = categoryService.findDtoBySlug(slug);
         return ResponseEntity.ok(ApiResponse.success("Category retrieved successfully", category));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Category>> createCategory(@RequestBody Category category) {
-        Category savedCategory = categoryService.save(category);
+    public ResponseEntity<ApiResponse<CategoryDto>> createCategory(@Valid @RequestBody CategoryDto categoryDto) {
+        CategoryDto savedCategory = categoryService.saveDto(categoryDto);
         return ResponseEntity.ok(ApiResponse.success("Category created successfully", savedCategory));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Category>> updateCategory(
+    public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(
             @PathVariable Long id,
-            @RequestBody Category categoryDetails) {
+            @Valid @RequestBody CategoryDto categoryDto) {
 
-        Category updatedCategory = categoryService.update(id, categoryDetails);
+        CategoryDto updatedCategory = categoryService.updateDto(id, categoryDto);
         return ResponseEntity.ok(ApiResponse.success("Category updated successfully", updatedCategory));
     }
 

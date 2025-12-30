@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.second_project.ecommerce.entity.Category;
@@ -24,5 +26,12 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     boolean existsByName(String name);
     
     boolean existsBySlug(String slug);
+    
+    /**
+     * Count products in a category (including all products, not just approved ones).
+     * Uses the join table to count efficiently without loading products.
+     */
+    @Query("SELECT COUNT(p) FROM Product p JOIN p.categories c WHERE c.id = :categoryId")
+    Long countProductsByCategoryId(@Param("categoryId") Long categoryId);
 }
 

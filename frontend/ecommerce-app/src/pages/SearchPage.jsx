@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, Star } from 'lucide-react';
 import { Input, Button } from '../components/ui';
 import { ProductGrid } from '../components/product';
+import { productApi } from '../services/productApi';
+import { categoryApi } from '../services/categoryApi';
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,6 +19,11 @@ const SearchPage = () => {
   const [sortBy, setSortBy] = useState('relevance');
   const [wishlistItems, setWishlistItems] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [totalElements, setTotalElements] = useState(0);
 
   // Get search query from URL on mount
   useEffect(() => {
@@ -26,146 +33,94 @@ const SearchPage = () => {
     }
   }, [searchParams]);
 
-  // Mock all products
-  const allProducts = [
-    {
-      id: 1,
-      name: 'iPhone 15 Pro Max 256GB - Chính hãng VN/A',
-      price: 29990000,
-      originalPrice: 32990000,
-      discount: 9,
-      rating: 4.8,
-      reviewCount: 256,
-      image: 'https://images.unsplash.com/photo-1592899677975-4028a4aaf2dd?w=300&h=300&fit=crop',
-      shop: 'Tech World',
-      category: 'electronics',
-      location: 'HCM',
-      freeShipping: true,
-      sold: 523
-    },
-    {
-      id: 2,
-      name: 'Áo thun nam cotton cao cấp',
-      price: 199000,
-      originalPrice: 299000,
-      discount: 33,
-      rating: 4.5,
-      reviewCount: 128,
-      image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop',
-      shop: 'Fashion Store',
-      category: 'fashion',
-      location: 'HN',
-      freeShipping: false,
-      sold: 1234
-    },
-    {
-      id: 3,
-      name: 'Nike Air Max 270 - Giày thể thao',
-      price: 2490000,
-      originalPrice: 2990000,
-      discount: 17,
-      rating: 4.6,
-      reviewCount: 89,
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=300&fit=crop',
-      shop: 'Shoe Store',
-      category: 'fashion',
-      location: 'HCM',
-      freeShipping: true,
-      sold: 456
-    },
-    {
-      id: 4,
-      name: 'Laptop Dell XPS 13 - i7 16GB RAM',
-      price: 25990000,
-      originalPrice: 29990000,
-      discount: 13,
-      rating: 4.7,
-      reviewCount: 45,
-      image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=300&h=300&fit=crop',
-      shop: 'Computer Hub',
-      category: 'electronics',
-      location: 'HCM',
-      freeShipping: true,
-      sold: 89
-    },
-    {
-      id: 5,
-      name: 'Túi xách nữ da thật cao cấp',
-      price: 890000,
-      originalPrice: 1290000,
-      discount: 31,
-      rating: 4.4,
-      reviewCount: 67,
-      image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=300&fit=crop',
-      shop: 'Bag Store',
-      category: 'fashion',
-      location: 'HN',
-      freeShipping: false,
-      sold: 234
-    },
-    {
-      id: 6,
-      name: 'Nồi chiên không dầu 5L',
-      price: 1290000,
-      originalPrice: 2590000,
-      discount: 50,
-      rating: 4.7,
-      reviewCount: 189,
-      image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=300&h=300&fit=crop',
-      shop: 'Kitchen Store',
-      category: 'home',
-      location: 'HCM',
-      freeShipping: true,
-      sold: 890
-    },
-    {
-      id: 7,
-      name: 'Đồng hồ thông minh Xiaomi Band 8',
-      price: 790000,
-      originalPrice: 1190000,
-      discount: 34,
-      rating: 4.4,
-      reviewCount: 234,
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
-      shop: 'Xiaomi Store',
-      category: 'electronics',
-      location: 'HN',
-      freeShipping: false,
-      sold: 2890
-    },
-    {
-      id: 8,
-      name: 'Sách "Đắc Nhân Tâm" - Bìa cứng',
-      price: 89000,
-      originalPrice: 129000,
-      discount: 31,
-      rating: 4.9,
-      reviewCount: 567,
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=300&fit=crop',
-      shop: 'Book Store',
-      category: 'books',
-      location: 'HCM',
-      freeShipping: true,
-      sold: 3456
-    }
-  ];
+  // Fetch categories for filter dropdown
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryApi.getAllCategories();
+        if (response.data.success) {
+          setCategories(response.data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
-  // Apply filters
-  const filteredProducts = allProducts.filter(product => {
-    // Search term
-    if (searchTerm && !product.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
+  // Fetch products from API when search term changes
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const keyword = searchTerm.trim();
+      
+      // If no search term, show empty results or all products
+      if (!keyword) {
+        setProducts([]);
+        setTotalElements(0);
+        return;
+      }
 
-    // Category filter
-    if (filters.category && product.category !== filters.category) {
-      return false;
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await productApi.searchProducts(keyword, 0, 100);
+        
+        if (response.data.success) {
+          const mappedProducts = (response.data.data || []).map(product => ({
+            id: product.id,
+            name: product.name,
+            price: product.price ? parseFloat(product.price) : 0,
+            originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
+            discount: product.discountPercentage || (product.originalPrice && product.price 
+              ? Math.round(((parseFloat(product.originalPrice) - parseFloat(product.price)) / parseFloat(product.originalPrice)) * 100)
+              : 0),
+            rating: product.averageRating || 0,
+            reviewCount: product.reviews?.length || 0,
+            image: product.images && product.images.length > 0 
+              ? product.images[0] 
+              : 'https://via.placeholder.com/300',
+            shop: product.seller?.fullName || product.seller?.email || 'Shop',
+            category: product.categories && product.categories.length > 0 
+              ? product.categories[0].slug || product.categories[0].name.toLowerCase() 
+              : '',
+            location: '', // Not available in current Product entity
+            freeShipping: false, // Not available in current Product entity
+            sold: product.soldCount || 0
+          }));
+          
+          setProducts(mappedProducts);
+          setTotalElements(response.data.totalElements || mappedProducts.length);
+        } else {
+          setError(response.data.message || 'Failed to fetch products');
+          setProducts([]);
+        }
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError(err.response?.data?.message || 'Failed to search products');
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [searchTerm]);
+
+  // Apply filters on fetched products
+  const filteredProducts = products.filter(product => {
+    // Category filter - check if product belongs to selected category
+    if (filters.category) {
+      const categoryMatch = product.category === filters.category || 
+                           product.category?.toLowerCase() === filters.category.toLowerCase();
+      if (!categoryMatch) {
+        return false;
+      }
     }
 
     // Price range filter
     if (filters.priceRange) {
       const [min, max] = filters.priceRange.split('-').map(Number);
-      if (max) {
+      if (max && max < 999999999) {
         if (product.price < min || product.price > max) return false;
       } else {
         if (product.price < min) return false;
@@ -177,15 +132,15 @@ const SearchPage = () => {
       return false;
     }
 
-    // Free shipping filter
-    if (filters.shipping && !product.freeShipping) {
-      return false;
-    }
+    // Free shipping filter (not available in current data model, so skip for now)
+    // if (filters.shipping && !product.freeShipping) {
+    //   return false;
+    // }
 
-    // Location filter
-    if (filters.location && product.location !== filters.location) {
-      return false;
-    }
+    // Location filter (not available in current data model, so skip for now)
+    // if (filters.location && product.location !== filters.location) {
+    //   return false;
+    // }
 
     return true;
   });
@@ -320,10 +275,11 @@ const SearchPage = () => {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-shopee-orange"
                   >
                     <option value="">Tất cả</option>
-                    <option value="electronics">Điện tử</option>
-                    <option value="fashion">Thời trang</option>
-                    <option value="home">Gia dụng</option>
-                    <option value="books">Sách</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.slug || cat.name.toLowerCase()}>
+                        {cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -414,9 +370,20 @@ const SearchPage = () => {
             {/* Sort and Results */}
             <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Tìm thấy <span className="font-semibold text-gray-900">{sortedProducts.length}</span> sản phẩm
-                {searchTerm && (
-                  <span> cho "<span className="font-semibold text-gray-900">{searchTerm}</span>"</span>
+                {loading ? (
+                  <span>Đang tìm kiếm...</span>
+                ) : error ? (
+                  <span className="text-red-600">{error}</span>
+                ) : (
+                  <>
+                    Tìm thấy <span className="font-semibold text-gray-900">{totalElements}</span> sản phẩm
+                    {searchTerm && (
+                      <span> cho "<span className="font-semibold text-gray-900">{searchTerm}</span>"</span>
+                    )}
+                    {filteredProducts.length !== totalElements && (
+                      <span> (hiển thị {filteredProducts.length} sau khi lọc)</span>
+                    )}
+                  </>
                 )}
               </div>
               
@@ -437,7 +404,18 @@ const SearchPage = () => {
             </div>
 
             {/* Products Grid */}
-            {sortedProducts.length > 0 ? (
+            {loading ? (
+              <div className="bg-white rounded-lg shadow-sm p-16 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-shopee-orange mx-auto mb-4"></div>
+                <p className="text-gray-600">Đang tải sản phẩm...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-white rounded-lg shadow-sm p-16 text-center">
+                <div className="text-red-400 text-6xl mb-4">⚠</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Lỗi khi tải dữ liệu</h3>
+                <p className="text-gray-600 mb-4">{error}</p>
+              </div>
+            ) : sortedProducts.length > 0 ? (
               <ProductGrid
                 products={sortedProducts}
                 columns={4}
@@ -449,7 +427,11 @@ const SearchPage = () => {
               <div className="bg-white rounded-lg shadow-sm p-16 text-center">
                 <div className="text-gray-400 text-6xl mb-4">🔍</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Không tìm thấy sản phẩm</h3>
-                <p className="text-gray-600 mb-4">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+                <p className="text-gray-600 mb-4">
+                  {searchTerm 
+                    ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+                    : 'Nhập từ khóa để tìm kiếm sản phẩm'}
+                </p>
                 {activeFilterCount > 0 && (
                   <Button onClick={clearFilters} variant="outline">
                     Xóa bộ lọc

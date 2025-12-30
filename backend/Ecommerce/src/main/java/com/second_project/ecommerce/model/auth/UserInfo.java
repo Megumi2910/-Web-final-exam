@@ -15,6 +15,8 @@ public class UserInfo {
     private String firstName;
     private String lastName;
     private String email;
+    private String phoneNumber;
+    private String address;
     private String role;
     private Boolean isVerified;
     private Boolean isSellerApproved;
@@ -29,6 +31,8 @@ public class UserInfo {
         this.firstName = user.getFirstName();
         this.lastName = user.getLastName();
         this.email = user.getEmail();
+        this.phoneNumber = user.getPhoneNumber();
+        this.address = user.getAddress();
         this.role = user.getRole() != null ? user.getRole().name() : null;
         this.isVerified = user.getIsVerified();
         this.isSellerApproved = user.getIsSellerApproved();

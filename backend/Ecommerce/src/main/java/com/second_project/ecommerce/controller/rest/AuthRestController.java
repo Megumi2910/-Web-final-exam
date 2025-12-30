@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.second_project.ecommerce.entity.User;
@@ -86,15 +87,44 @@ public class AuthRestController {
                         .body(ApiResponse.error("User not authenticated"));
             }
             
-            userService.requestVerificationEmail(currentUser.getEmail());
+            // Use synchronous method to get immediate feedback on success/failure
+            userService.resendVerificationEmailSynchronously(currentUser.getEmail());
             return ResponseEntity.ok(ApiResponse.success("Verification email sent successfully", null));
         } catch (IllegalArgumentException e) {
+            // Handle validation errors (user not found, already verified, rate limit, etc.)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            // Handle email sending failures
+            log.error("Error resending verification email", e);
+            String errorMessage = "Failed to send verification email. ";
+            if (e.getMessage() != null && e.getMessage().contains("Failed to send verification email")) {
+                errorMessage += "Please check email configuration or try again later.";
+            } else {
+                errorMessage += e.getMessage();
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(errorMessage));
+        } catch (Exception e) {
+            log.error("Unexpected error resending verification email", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("An unexpected error occurred. Please try again later."));
+        }
+    }
+
+    @GetMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        try {
+            userService.verifyUser(token);
+            return ResponseEntity.ok(ApiResponse.success("Email verified successfully", null));
+        } catch (IllegalArgumentException e) {
+            log.warn("Email verification failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error resending verification email", e);
+            log.error("Unexpected error during email verification", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to send verification email. Please try again."));
+                    .body(ApiResponse.error("An unexpected error occurred during verification. Please try again."));
         }
     }
 }

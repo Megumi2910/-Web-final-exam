@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { productApi } from '../../services/productApi';
+import ProductForm from '../../components/admin/ProductForm';
 
 const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject }) => {
   const getStatusText = (status) => {
@@ -132,6 +133,7 @@ const AdminProducts = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -148,12 +150,19 @@ const AdminProducts = () => {
       setLoading(true);
       setError(null);
       const response = await adminApi.getAllProducts(page, 20);
-      const data = response.data.data;
-      setProducts(data.content || []);
-      setTotalPages(data.totalPages || 0);
+      console.log('Products API response:', response.data); // Debugging log
+      if (response.data.success) {
+        // PageResponse structure: data.data is the list, pagination fields are at response.data level
+        const productsList = response.data.data || [];
+        setProducts(productsList);
+        setTotalPages(response.data.totalPages || 0);
+      } else {
+        setError(response.data.message || 'Failed to fetch products');
+        setProducts([]);
+      }
     } catch (err) {
       console.error('Failed to fetch products:', err);
-      setError('Không thể tải danh sách sản phẩm');
+      setError(err.response?.data?.message || err.message || 'Không thể tải danh sách sản phẩm');
       setProducts([]);
     } finally {
       setLoading(false);
@@ -171,7 +180,29 @@ const AdminProducts = () => {
   });
 
   const handleEdit = (product) => {
-    console.log('Edit product:', product);
+    setEditingProduct(product);
+    setShowAddModal(true);
+  };
+
+  const handleSave = async (productData) => {
+    try {
+      if (editingProduct) {
+        await productApi.updateProduct(editingProduct.id, productData);
+      } else {
+        await productApi.createProduct(productData);
+      }
+      fetchProducts();
+      setShowAddModal(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error('Failed to save product:', err);
+      throw err; // Let ProductForm handle the error display
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setEditingProduct(null);
   };
 
   const handleDelete = async (product) => {
@@ -374,25 +405,14 @@ const AdminProducts = () => {
         </>
       )}
 
-      {/* Add Product Modal */}
+      {/* Add/Edit Product Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Thêm sản phẩm mới</h3>
-            <p className="text-gray-500 mb-4">Form thêm sản phẩm sẽ được hiển thị ở đây</p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                Thêm sản phẩm
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProductForm
+          product={editingProduct}
+          onClose={handleCloseModal}
+          onSave={handleSave}
+          isAdmin={true}
+        />
       )}
     </div>
   );

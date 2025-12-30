@@ -1,11 +1,14 @@
 package com.second_project.ecommerce.controller.rest;
 
+import com.second_project.ecommerce.entity.Category;
 import com.second_project.ecommerce.entity.Order;
 import com.second_project.ecommerce.entity.Product;
 import com.second_project.ecommerce.entity.User;
 import com.second_project.ecommerce.model.ApiResponse;
 import com.second_project.ecommerce.model.PageResponse;
+import com.second_project.ecommerce.model.ProductDto;
 import com.second_project.ecommerce.security.CustomUserDetails;
+import com.second_project.ecommerce.service.CategoryService;
 import com.second_project.ecommerce.service.OrderService;
 import com.second_project.ecommerce.service.ProductService;
 import com.second_project.ecommerce.service.UserService;
@@ -31,10 +34,11 @@ public class SellerRestController {
     private final ProductService productService;
     private final OrderService orderService;
     private final UserService userService;
+    private final CategoryService categoryService;
 
     // Product Management
     @GetMapping("/products")
-    public ResponseEntity<PageResponse<Product>> getSellerProducts(
+    public ResponseEntity<PageResponse<ProductDto>> getSellerProducts(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -44,10 +48,19 @@ public class SellerRestController {
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> productPage = productService.findBySeller(seller, pageable);
+        
+        // Convert to DTOs
+        List<ProductDto> dtos = productPage.getContent().stream()
+                .map(product -> {
+                    ProductDto dto = productService.findDtoById(product.getId())
+                            .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
 
         return ResponseEntity.ok(PageResponse.success(
                 "Seller products retrieved successfully",
-                productPage.getContent(),
+                dtos,
                 productPage.getNumber(),
                 productPage.getSize(),
                 productPage.getTotalElements(),
@@ -56,9 +69,9 @@ public class SellerRestController {
     }
 
     @PostMapping("/products")
-    public ResponseEntity<ApiResponse<Product>> createProduct(
+    public ResponseEntity<ApiResponse<ProductDto>> createProduct(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody Product product) {
+            @RequestBody ProductDto productDto) {
 
         User seller = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -68,18 +81,27 @@ public class SellerRestController {
             throw new IllegalArgumentException("Seller is not approved");
         }
 
+        // Set seller ID in DTO
+        productDto.setSellerId(seller.getId());
+        
+        // Convert DTO to entity, set seller, then save
+        Product product = convertDtoToEntity(productDto);
         product.setSeller(seller);
         Product savedProduct = productService.save(product);
+        
         log.info("Product created by seller {}: {}", seller.getUserId(), savedProduct.getProductId());
 
-        return ResponseEntity.ok(ApiResponse.success("Product created successfully. Awaiting admin approval.", savedProduct));
+        ProductDto savedDto = productService.findDtoById(savedProduct.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        
+        return ResponseEntity.ok(ApiResponse.success("Product created successfully. Awaiting admin approval.", savedDto));
     }
 
     @PutMapping("/products/{id}")
-    public ResponseEntity<ApiResponse<Product>> updateProduct(
+    public ResponseEntity<ApiResponse<ProductDto>> updateProduct(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @RequestBody Product productDetails) {
+            @RequestBody ProductDto productDetails) {
 
         User seller = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -92,10 +114,45 @@ public class SellerRestController {
             throw new IllegalArgumentException("Product does not belong to seller");
         }
 
-        Product updatedProduct = productService.update(id, productDetails);
+        ProductDto updatedProduct = productService.updateDto(id, productDetails);
         log.info("Product {} updated by seller {}", id, seller.getUserId());
 
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updatedProduct));
+    }
+    
+    /**
+     * Helper method to convert ProductDto to Product entity for seller operations
+     */
+    private Product convertDtoToEntity(ProductDto dto) {
+        Product product = new Product();
+        if (dto.getId() != null) {
+            product.setId(dto.getId());
+        }
+        product.setName(dto.getName());
+        product.setBrand(dto.getBrand());
+        product.setSku(dto.getSku());
+        product.setSlug(dto.getSlug());
+        product.setDescription(dto.getDescription());
+        product.setPrice(dto.getPrice());
+        product.setOriginalPrice(dto.getOriginalPrice());
+        product.setStock(dto.getStock() != null ? dto.getStock() : 0);
+        product.setSoldCount(dto.getSoldCount() != null ? dto.getSoldCount() : 0);
+        product.setImages(dto.getImages());
+        product.setIsFeatured(dto.getIsFeatured() != null ? dto.getIsFeatured() : false);
+        product.setIsHot(dto.getIsHot() != null ? dto.getIsHot() : false);
+        product.setIsNew(dto.getIsNew() != null ? dto.getIsNew() : false);
+        product.setStatus(dto.getStatus() != null ? dto.getStatus() : Product.ProductStatus.PENDING);
+        
+        // Set categories if provided
+        if (dto.getCategoryIds() != null && !dto.getCategoryIds().isEmpty()) {
+            java.util.Set<Category> categories = dto.getCategoryIds().stream()
+                    .map(categoryId -> categoryService.findById(categoryId)
+                            .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId)))
+                    .collect(java.util.stream.Collectors.toSet());
+            product.setCategories(categories);
+        }
+        
+        return product;
     }
 
     @DeleteMapping("/products/{id}")

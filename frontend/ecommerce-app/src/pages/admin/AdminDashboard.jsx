@@ -153,11 +153,11 @@ const AdminDashboard = () => {
       setLoading(true);
       // Fetch orders to calculate stats
       const ordersResponse = await adminApi.getAllOrders(0, 100);
-      const orders = ordersResponse.data.data.content || [];
+      const orders = ordersResponse.data.success ? (ordersResponse.data.data || []) : [];
       
       // Fetch products
       const productsResponse = await adminApi.getAllProducts(0, 100);
-      const products = productsResponse.data.data.content || [];
+      const products = productsResponse.data.success ? (productsResponse.data.data || []) : [];
 
       // Calculate stats from data
       const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);

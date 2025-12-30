@@ -14,36 +14,19 @@ import {
 import { Button, Badge, Card } from '../../components/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useAuth } from '../../context/AuthContext';
 
 const CheckoutPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [selectedAddress, setSelectedAddress] = useState(1);
+  const { user } = useAuth();
+  const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState('cod');
   const [note, setNote] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
 
-  // Mock data - chuyển thành state để có thể thêm địa chỉ mới
-  const [addresses, setAddresses] = useState([
-    {
-      id: 1,
-      name: 'Nhà riêng',
-      fullName: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '123 Đường ABC, Phường XYZ, Quận 1',
-      city: 'TP. Hồ Chí Minh',
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: 'Văn phòng',
-      fullName: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '456 Đường DEF, Quận 3',
-      city: 'TP. Hồ Chí Minh',
-      isDefault: false
-    }
-  ]);
+  // Addresses state - initialized empty, users can add addresses
+  const [addresses, setAddresses] = useState([]);
 
   // State cho form thêm địa chỉ
   const [newAddress, setNewAddress] = useState({
@@ -58,6 +41,27 @@ const CheckoutPage = () => {
   // Lấy data từ router state (từ giỏ hàng)
   const checkoutData = location.state;
   
+  // Initialize with user info if available (optional default address)
+  useEffect(() => {
+    if (user && user.fullName && addresses.length === 0) {
+      // Create a default address from user info if available
+      const defaultAddress = {
+        id: 1,
+        name: 'Địa chỉ mặc định',
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        city: user.city || 'TP. Hồ Chí Minh',
+        isDefault: true
+      };
+      // Only add if user has at least name
+      if (defaultAddress.fullName) {
+        setAddresses([defaultAddress]);
+        setSelectedAddress(1);
+      }
+    }
+  }, [user]);
+
   // Nếu không có data (user vào trực tiếp URL), redirect về cart
   useEffect(() => {
     if (!checkoutData || !checkoutData.cartItems || checkoutData.cartItems.length === 0) {
@@ -167,14 +171,15 @@ const CheckoutPage = () => {
     }
 
     // Tạo địa chỉ mới
+    const nextId = addresses.length > 0 ? Math.max(...addresses.map(a => a.id)) + 1 : 1;
     const addressToAdd = {
-      id: addresses.length + 1,
+      id: nextId,
       name: newAddress.name || 'Địa chỉ mới',
       fullName: newAddress.fullName,
       phone: newAddress.phone,
       address: newAddress.address,
       city: newAddress.city,
-      isDefault: newAddress.isDefault
+      isDefault: newAddress.isDefault || addresses.length === 0
     };
 
     // Nếu địa chỉ mới là mặc định, cập nhật các địa chỉ cũ

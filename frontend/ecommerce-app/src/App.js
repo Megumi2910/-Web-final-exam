@@ -17,6 +17,7 @@ import SearchPage from './pages/SearchPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
+import AdminCategories from './pages/admin/AdminCategories';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
@@ -65,6 +66,7 @@ function App() {
         }>
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="categories" element={<AdminCategories />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="analytics" element={<AdminAnalytics />} />
@@ -93,10 +95,16 @@ function App() {
         }>
           <Route path="dashboard" element={<CustomerDashboard />} />
           <Route path="orders" element={<CustomerOrders />} />
-          <Route path="profile" element={<CustomerProfile />} />
           <Route path="wishlist" element={<CustomerWishlist />} />
           <Route path="wallet" element={<CustomerDashboard />} />
         </Route>
+        
+        {/* Customer profile - accessible to both CUSTOMER and ADMIN */}
+        <Route path="/customer/profile" element={
+          <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
+            <Layout><CustomerProfile /></Layout>
+          </ProtectedRoute>
+        } />
 
         {/* Shopping cart and checkout - Protected for authenticated users */}
         <Route path="/cart" element={

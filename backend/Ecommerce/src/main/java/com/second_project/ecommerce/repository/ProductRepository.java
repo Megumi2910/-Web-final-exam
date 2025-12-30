@@ -58,5 +58,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByStatus(ProductStatus status);
     
     long countBySellerId(Long sellerId);
+    
+    // Query to get seller ID for a product (using native query to avoid lazy loading)
+    @Query(value = "SELECT seller_id FROM products WHERE id = :productId", nativeQuery = true)
+    Long findSellerIdByProductId(@Param("productId") Long productId);
+    
+    // Query to get category IDs for a product
+    @Query("SELECT c.id FROM Product p JOIN p.categories c WHERE p.id = :productId")
+    List<Long> findCategoryIdsByProductId(@Param("productId") Long productId);
 }
 

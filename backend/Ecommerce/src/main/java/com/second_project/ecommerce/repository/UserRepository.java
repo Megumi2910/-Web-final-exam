@@ -34,5 +34,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findByIsVerified(Boolean isVerified, Pageable pageable);
     
     long countByRole(UserRole role);
+    
+    /**
+     * Searches users by email, first name, or last name containing the given keyword
+     * (case-insensitive).
+     *
+     * @param emailKeyword     Keyword for email
+     * @param firstNameKeyword Keyword for first name
+     * @param lastNameKeyword  Keyword for last name
+     * @param pageable         Pagination information
+     * @return Page of users matching the keyword
+     */
+    Page<User> findByEmailContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+            String emailKeyword, String firstNameKeyword, String lastNameKeyword, Pageable pageable);
 }
 

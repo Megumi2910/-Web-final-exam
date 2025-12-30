@@ -17,6 +17,16 @@ public interface OrderService {
     Page<Order> findByStatus(Order.OrderStatus status, Pageable pageable);
     void cancelOrder(Long orderId, User user);
     List<Order> findOrdersBySeller(User seller);
+    OrderStatistics getUserOrderStatistics(User user);
+    
+    @lombok.Data
+    class OrderStatistics {
+        private Long totalCount;
+        private Long pendingCount;
+        private Long shippingCount;
+        private Long completedCount;
+        private Long cancelledCount;
+    }
 }
 
 
