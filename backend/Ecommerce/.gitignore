@@ -4,9 +4,9 @@
 !/README.md
 
 # Environment Variables (contains sensitive credentials)
-.env
-.env.local
-.env.*.local
+# .env
+# .env.local
+# .env.*.local
 
 target/
 .mvn/wrapper/maven-wrapper.jar
