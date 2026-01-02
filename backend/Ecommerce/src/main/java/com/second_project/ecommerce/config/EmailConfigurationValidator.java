@@ -28,6 +28,18 @@ public class EmailConfigurationValidator {
 
     @PostConstruct
     public void validateEmailConfiguration() {
+        // Log environment variable sources for debugging
+        String envMailUsername = System.getenv("MAIL_USERNAME");
+        String sysPropMailUsername = System.getProperty("MAIL_USERNAME");
+        
+        log.info("================================================");
+        log.info("EMAIL CONFIGURATION DIAGNOSTICS");
+        log.info("================================================");
+        log.info("System.getenv('MAIL_USERNAME'): {}", envMailUsername != null ? envMailUsername : "NOT SET");
+        log.info("System.getProperty('MAIL_USERNAME'): {}", sysPropMailUsername != null ? sysPropMailUsername : "NOT SET");
+        log.info("Spring @Value('spring.mail.username'): {}", mailUsername != null && !mailUsername.isEmpty() ? mailUsername : "NOT SET");
+        log.info("================================================");
+        
         boolean isConfigured = mailUsername != null && !mailUsername.trim().isEmpty()
                 && mailPassword != null && !mailPassword.trim().isEmpty();
 
@@ -45,7 +57,13 @@ public class EmailConfigurationValidator {
             log.warn("  - MAIL_PORT=587 (optional, default: 587)");
             log.warn("================================================");
         } else {
-            log.info("Email configuration validated successfully. Mail host: {}", mailHost);
+            log.info("================================================");
+            log.info("EMAIL CONFIGURATION VALIDATED");
+            log.info("================================================");
+            log.info("Mail host: {}", mailHost);
+            log.info("Mail username (sender): {}", mailUsername);
+            log.info("Mail password: {} (configured)", mailPassword != null && !mailPassword.isEmpty() ? "***" : "NOT SET");
+            log.info("================================================");
             // Test connection (optional - can be enabled if needed)
             // try {
             //     javaMailSender.testConnection();

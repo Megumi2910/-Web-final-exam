@@ -13,6 +13,7 @@ import {
   Upload,
   Image
 } from 'lucide-react';
+import { categoryApi } from '../../services/categoryApi';
 
 const ProductCard = ({ product, onEdit, onDelete, onView }) => {
   return (
@@ -99,9 +100,28 @@ const SellerProducts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    stock: '',
+    category: '',
+    description: '',
+    images: []
+  });
+  const [imageUrl, setImageUrl] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (showAddModal) {
+      fetchCategories();
+    }
+  }, [showAddModal]);
 
   const fetchProducts = async () => {
     try {
@@ -118,6 +138,21 @@ const SellerProducts = () => {
       setError('Không thể tải danh sách sản phẩm. Vui lòng thử lại.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await categoryApi.getAllCategories();
+      if (response.data.success) {
+        setCategories(response.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
     }
   };
 
@@ -141,6 +176,61 @@ const SellerProducts = () => {
 
   const handleView = (product) => {
     console.log('View product:', product);
+  };
+
+  const handleAddImage = () => {
+    if (imageUrl.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, imageUrl.trim()]
+      }));
+      setImageUrl('');
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // TODO: Implement API call to create product
+    console.log('Submitting product:', formData);
+    // Reset form
+    setFormData({
+      name: '',
+      price: '',
+      stock: '',
+      category: '',
+      description: '',
+      images: []
+    });
+    setImageUrl('');
+    setShowAddModal(false);
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setFormData({
+      name: '',
+      price: '',
+      stock: '',
+      category: '',
+      description: '',
+      images: []
+    });
+    setImageUrl('');
   };
 
   const stats = {
@@ -295,13 +385,17 @@ const SellerProducts = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Thêm sản phẩm mới</h3>
             
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tên sản phẩm</label>
                 <input
                   type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập tên sản phẩm"
+                  required
                 />
               </div>
               
@@ -310,34 +404,64 @@ const SellerProducts = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Giá</label>
                   <input
                     type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleFormChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
+                    min="0"
+                    required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng</label>
                   <input
                     type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleFormChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
+                    min="0"
+                    required
                   />
                 </div>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Chọn danh mục</option>
-                  <option value="phone">Điện thoại</option>
-                  <option value="laptop">Laptop</option>
-                  <option value="tablet">Tablet</option>
-                  <option value="accessory">Phụ kiện</option>
-                </select>
+                {loadingCategories ? (
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-lg flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm text-gray-500">Đang tải danh mục...</span>
+                  </div>
+                ) : (
+                  <select 
+                    name="category"
+                    value={formData.category}
+                    onChange={handleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    disabled={categories.length === 0}
+                  >
+                    <option value="">
+                      {categories.length === 0 ? 'Chưa có danh mục nào' : 'Chọn danh mục'}
+                    </option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả</label>
                 <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleFormChange}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Mô tả sản phẩm"
@@ -345,25 +469,84 @@ const SellerProducts = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Kéo thả hình ảnh hoặc click để chọn</p>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hình ảnh <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      placeholder="Nhập URL hình ảnh"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddImage();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddImage}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Thêm</span>
+                    </button>
+                  </div>
+
+                  {formData.images.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {formData.images.map((img, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={img}
+                            alt={`Product ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg border border-gray-300"
+                            onError={(e) => {
+                              e.target.src = 'https://via.placeholder.com/150';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {formData.images.length === 0 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">Nhập URL hình ảnh và nhấn "Thêm" để tải lên</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
             
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Thêm sản phẩm
-              </button>
-            </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={formData.images.length === 0}
+                >
+                  Thêm sản phẩm
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

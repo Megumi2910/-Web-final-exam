@@ -19,6 +19,28 @@ public class EmailServiceImpl implements EmailService {
     private String fromEmail;
 
     private final JavaMailSender javaMailSender;
+    
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        // Diagnostic logging to identify configuration source
+        String envVar = System.getenv("MAIL_USERNAME");
+        String sysProp = System.getProperty("MAIL_USERNAME");
+        
+        log.info("================================================");
+        log.info("EmailServiceImpl INITIALIZATION");
+        log.info("================================================");
+        log.info("System.getenv('MAIL_USERNAME'): {}", envVar != null ? envVar : "NOT SET");
+        log.info("System.getProperty('MAIL_USERNAME'): {}", sysProp != null ? sysProp : "NOT SET");
+        log.info("@Value('spring.mail.username') resolved to: {}", fromEmail);
+        log.info("================================================");
+        
+        if (fromEmail == null || fromEmail.trim().isEmpty()) {
+            log.error("CRITICAL: fromEmail is NULL or EMPTY! Email service will not work.");
+        } else if (fromEmail.contains("quangminhh29190")) {
+            log.error("CRITICAL: Using OLD email address: {}. Expected: minhnq29190@gmail.com", fromEmail);
+            log.error("This indicates environment variable MAIL_USERNAME is not being read correctly.");
+        }
+    }
 
     @Override
     public void sendVerificationEmail(String toEmail, String subject, String body) {
@@ -34,8 +56,9 @@ public class EmailServiceImpl implements EmailService {
             message.setSubject(subject);
             message.setText(body);
 
+            log.info("Sending email from: {} to: {} with subject: {}", fromEmail, toEmail, subject);
             javaMailSender.send(message);
-            log.info("Email sent successfully to: {}", toEmail);
+            log.info("Email sent successfully from: {} to: {}", fromEmail, toEmail);
         } catch (Exception e) {
             log.error("Failed to send email to: {}. Error: {}", toEmail, e.getMessage(), e);
             if (e.getMessage() != null && e.getMessage().contains("not configured")) {
