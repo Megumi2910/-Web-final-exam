@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,35 +15,58 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(
     name = "reviews",
+    uniqueConstraints = @UniqueConstraint(name = "UK_USER_PRODUCT_REVIEW", columnNames = {"user_id", "product_id"}),
     indexes = {
         @Index(name = "idx_review_product", columnList = "product_id"),
         @Index(name = "idx_review_user", columnList = "user_id"),
-        @Index(name = "idx_review_rating", columnList = "rating")
+        @Index(name = "idx_review_rating", columnList = "rating"),
+        @Index(name = "idx_review_created", columnList = "product_id, createdAt")
     }
 )
 public class Review {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @JoinColumn(
+        name = "product_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "FK_REVIEW_PRODUCT")
+    )
+    @NotNull
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(
+        name = "user_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "FK_REVIEW_USER")
+    )
+    @NotNull
     private User user;
 
-    @Column(nullable = false)
-    private Integer rating; // 1-5 stars
+    @Column(nullable = true)
+    @Min(value = 1, message = "Rating must be at least 1")
+    @Max(value = 5, message = "Rating must be at most 5")
+    private Integer rating; // 1-5 stars (nullable for admin/seller comments)
 
     @Column(columnDefinition = "TEXT")
     private String comment;
@@ -51,9 +75,11 @@ public class Review {
     private Boolean isVerifiedPurchase = false;
 
     @Column(nullable = false)
+    @NotNull
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
+    @NotNull
     private LocalDateTime updatedAt;
 
     public Review() {}
@@ -75,71 +101,4 @@ public class Review {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Product getProduct() {
-        return product;
-    }
-
-    public void setProduct(Product product) {
-        this.product = product;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public Integer getRating() {
-        return rating;
-    }
-
-    public void setRating(Integer rating) {
-        this.rating = rating;
-    }
-
-    public String getComment() {
-        return comment;
-    }
-
-    public void setComment(String comment) {
-        this.comment = comment;
-    }
-
-    public Boolean getIsVerifiedPurchase() {
-        return isVerifiedPurchase;
-    }
-
-    public void setIsVerifiedPurchase(Boolean isVerifiedPurchase) {
-        this.isVerifiedPurchase = isVerifiedPurchase;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }
-
-

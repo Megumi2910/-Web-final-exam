@@ -23,6 +23,7 @@ public class OrderItemDto {
     private BigDecimal productPrice;
     private Long sellerId;
     private String sellerName;
+    private String storeName;
     
     // Order item specific fields
     private Integer quantity;

@@ -7,8 +7,8 @@ export const adminApi = {
   },
 
   // Update order status (admin)
-  updateOrderStatus: (id, data) => {
-    return api.put(`/orders/${id}/status`, data);
+  updateOrderStatus: (id, status) => {
+    return api.put(`/orders/${id}/status?status=${status}`);
   },
 
   // Update delivery status (admin)

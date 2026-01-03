@@ -13,6 +13,7 @@ public interface OrderService {
     Order createOrder(User user, String shippingAddress, String shippingPhone);
     Order createOrderFromCart(User user, CheckoutRequestDto checkoutRequest);
     Order updateOrderStatus(Long orderId, Order.OrderStatus status);
+    com.second_project.ecommerce.model.OrderDto updateOrderStatusDto(Long orderId, Order.OrderStatus status);
     Optional<Order> findById(Long id);
     Page<Order> findByUser(User user, Pageable pageable);
     Page<Order> findAll(Pageable pageable);
@@ -25,6 +26,7 @@ public interface OrderService {
     com.second_project.ecommerce.model.OrderDto createOrderFromCartDto(User user, CheckoutRequestDto checkoutRequest);
     com.second_project.ecommerce.model.OrderDto getOrderDtoById(Long id);
     Page<com.second_project.ecommerce.model.OrderDto> findByUserDto(User user, Pageable pageable);
+    Page<com.second_project.ecommerce.model.OrderDto> findAllDto(Pageable pageable);
     
     DashboardStatistics getDashboardStatistics(User user);
     

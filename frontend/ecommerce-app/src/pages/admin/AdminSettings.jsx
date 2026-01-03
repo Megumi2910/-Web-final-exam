@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Settings as SettingsIcon,
   Save,
@@ -26,7 +27,20 @@ const SettingSection = ({ title, icon: Icon, children }) => {
 };
 
 const AdminSettings = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('system');
+
+  // Handle hash navigation (e.g., /admin/settings#profile)
+  useEffect(() => {
+    if (location.hash === '#profile') {
+      setActiveTab('profile');
+      // Scroll to top of content area
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (location.hash === '#system') {
+      setActiveTab('system');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [location.hash]);
   const [settings, setSettings] = useState({
     siteName: 'CNVLTW',
     siteDescription: 'Cửa hàng thương mại điện tử hàng đầu',

@@ -1,16 +1,47 @@
-import React, { useState } from 'react';
-import { Star, ThumbsUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Star, ThumbsUp, MessageSquare, X } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import { clsx } from 'clsx';
+import { useAuth } from '../../context/AuthContext';
+import { reviewApi } from '../../services/reviewApi';
 
 const ProductReviews = ({ 
+  productId,
   reviews = [], 
   rating = 0,
   reviewCount = 0,
-  className = '' 
+  ratingDistribution: propRatingDistribution = {},
+  className = '',
+  onReviewCreated
 }) => {
+  const { user, isAuthenticated, hasRole } = useAuth();
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [userReview, setUserReview] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+
+  // Use prop rating distribution if provided, otherwise calculate from reviews
+  const ratingDistribution = Object.keys(propRatingDistribution).length > 0
+    ? {
+        5: propRatingDistribution[5] || 0,
+        4: propRatingDistribution[4] || 0,
+        3: propRatingDistribution[3] || 0,
+        2: propRatingDistribution[2] || 0,
+        1: propRatingDistribution[1] || 0,
+      }
+    : {
+        5: reviews.filter(r => r.rating === 5).length,
+        4: reviews.filter(r => r.rating === 4).length,
+        3: reviews.filter(r => r.rating === 3).length,
+        2: reviews.filter(r => r.rating === 2).length,
+        1: reviews.filter(r => r.rating === 1).length,
+      };
 
   const filteredReviews = reviews.filter(review => {
     if (filter === 'all') return true;
@@ -24,19 +55,126 @@ const ProductReviews = ({
   });
 
   const sortedReviews = [...filteredReviews].sort((a, b) => {
-    if (sortBy === 'newest') return new Date(b.date) - new Date(a.date);
-    if (sortBy === 'oldest') return new Date(a.date) - new Date(b.date);
-    if (sortBy === 'highest') return b.rating - a.rating;
-    if (sortBy === 'lowest') return a.rating - b.rating;
+    const dateA = a.createdAt || a.date || a.updatedAt;
+    const dateB = b.createdAt || b.date || b.updatedAt;
+    
+    if (sortBy === 'newest') return new Date(dateB) - new Date(dateA);
+    if (sortBy === 'oldest') return new Date(dateA) - new Date(dateB);
+    if (sortBy === 'highest') {
+      // Handle null ratings (admin/seller comments) - put them at the end
+      if (!a.rating && !b.rating) return 0;
+      if (!a.rating) return 1;
+      if (!b.rating) return -1;
+      return b.rating - a.rating;
+    }
+    if (sortBy === 'lowest') {
+      // Handle null ratings (admin/seller comments) - put them at the end
+      if (!a.rating && !b.rating) return 0;
+      if (!a.rating) return 1;
+      if (!b.rating) return -1;
+      return a.rating - b.rating;
+    }
     return 0;
   });
 
-  const ratingDistribution = {
-    5: reviews.filter(r => r.rating === 5).length,
-    4: reviews.filter(r => r.rating === 4).length,
-    3: reviews.filter(r => r.rating === 3).length,
-    2: reviews.filter(r => r.rating === 2).length,
-    1: reviews.filter(r => r.rating === 1).length,
+  // Check if user can review and has purchased
+  useEffect(() => {
+    const checkReviewEligibility = async () => {
+      if (!isAuthenticated() || !productId) {
+        setCanReview(false);
+        return;
+      }
+
+      const isAdmin = hasRole('ADMIN');
+      const isSeller = hasRole('SELLER');
+      const isCustomer = hasRole('CUSTOMER');
+
+      try {
+        // Check if user has already reviewed
+        const hasReviewedResponse = await reviewApi.hasUserReviewedProduct(productId);
+        if (hasReviewedResponse.data.success && hasReviewedResponse.data.data) {
+          setHasReviewed(true);
+          // Get user's review
+          const userReviewResponse = await reviewApi.getUserReviewForProduct(productId);
+          if (userReviewResponse.data.success && userReviewResponse.data.data) {
+            setUserReview(userReviewResponse.data.data);
+          }
+        }
+
+        // For customers, check if they purchased the product
+        if (isCustomer) {
+          // The backend will check this when creating review, but we can show a message
+          setCanReview(true);
+        } else if (isAdmin || isSeller) {
+          // Admin and seller can always comment
+          setCanReview(true);
+        }
+      } catch (err) {
+        console.error('Error checking review eligibility:', err);
+        setCanReview(false);
+      }
+    };
+
+    checkReviewEligibility();
+  }, [productId, isAuthenticated, hasRole]);
+
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated()) {
+      alert('Vui lòng đăng nhập để đánh giá sản phẩm');
+      return;
+    }
+
+    const isAdmin = hasRole('ADMIN');
+    const isSeller = hasRole('SELLER');
+    const isCustomer = hasRole('CUSTOMER');
+
+    // Validation
+    if (isCustomer) {
+      if (reviewRating < 1 || reviewRating > 5) {
+        alert('Vui lòng chọn đánh giá từ 1 đến 5 sao');
+        return;
+      }
+    } else if (isAdmin || isSeller) {
+      if (!reviewComment || reviewComment.trim() === '') {
+        alert('Vui lòng nhập bình luận');
+        return;
+      }
+    }
+
+    try {
+      setIsSubmitting(true);
+      const reviewData = {
+        productId: productId,
+        rating: isCustomer ? reviewRating : null,
+        comment: reviewComment.trim() || null
+      };
+
+      if (hasReviewed && userReview) {
+        // Update existing review
+        await reviewApi.updateReview(userReview.id, reviewData);
+        alert('Cập nhật đánh giá thành công!');
+      } else {
+        // Create new review
+        await reviewApi.createReview(reviewData);
+        alert('Đánh giá thành công!');
+      }
+
+      // Reset form
+      setReviewRating(0);
+      setReviewComment('');
+      setShowReviewForm(false);
+      setHasReviewed(true);
+
+      // Refresh reviews
+      if (onReviewCreated) {
+        onReviewCreated();
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      alert(error.response?.data?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -150,32 +288,46 @@ const ProductReviews = ({
                         {review.userName || 'Người dùng ẩn danh'}
                       </div>
                       <div className="flex items-center space-x-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={clsx(
-                                'w-4 h-4',
-                                i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                              )}
-                            />
-                          ))}
-                        </div>
+                        {review.rating && (
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={clsx(
+                                  'w-4 h-4',
+                                  i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                )}
+                              />
+                            ))}
+                          </div>
+                        )}
                         <span className="text-sm text-gray-500">
-                          {new Date(review.date).toLocaleDateString('vi-VN')}
+                          {new Date(review.createdAt || review.date || review.updatedAt).toLocaleDateString('vi-VN')}
                         </span>
                       </div>
                     </div>
-                    {review.verified && (
-                      <Badge variant="success" size="sm">
-                        Đã mua hàng
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {review.userRole === 'ADMIN' && (
+                        <Badge variant="primary" size="sm">
+                          Admin
+                        </Badge>
+                      )}
+                      {review.userRole === 'SELLER' && review.sellerId && review.userId === review.sellerId && (
+                        <Badge variant="primary" size="sm">
+                          Seller
+                        </Badge>
+                      )}
+                      {review.isVerifiedPurchase && (
+                        <Badge variant="success" size="sm">
+                          Đã mua hàng
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
-                  {review.content && (
+                  {(review.comment || review.content) && (
                     <div className="text-gray-700 mb-3">
-                      {review.content}
+                      {review.comment || review.content}
                     </div>
                   )}
 
@@ -224,6 +376,127 @@ const ProductReviews = ({
           <Button variant="outline">
             Xem thêm đánh giá
           </Button>
+        </div>
+      )}
+
+      {/* Review Form */}
+      {isAuthenticated() && canReview && (
+        <div className="border-t border-gray-200 pt-6 mt-6">
+          {!showReviewForm ? (
+            <Button
+              onClick={() => setShowReviewForm(true)}
+              className="w-full"
+              variant="outline"
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              {hasReviewed ? 'Chỉnh sửa đánh giá của bạn' : hasRole('CUSTOMER') ? 'Viết đánh giá' : 'Viết bình luận'}
+            </Button>
+          ) : (
+            <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {hasRole('CUSTOMER') ? 'Viết đánh giá' : hasRole('ADMIN') ? 'Bình luận (Admin)' : 'Bình luận (Seller)'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowReviewForm(false);
+                    setReviewRating(0);
+                    setReviewComment('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {hasRole('CUSTOMER') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Đánh giá <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewRating(star)}
+                        className="focus:outline-none"
+                      >
+                        <Star
+                          className={clsx(
+                            'w-8 h-8 transition-colors',
+                            star <= reviewRating
+                              ? 'text-yellow-400 fill-current'
+                              : 'text-gray-300'
+                          )}
+                        />
+                      </button>
+                    ))}
+                    {reviewRating > 0 && (
+                      <span className="text-sm text-gray-600 ml-2">
+                        {reviewRating} sao
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {hasRole('CUSTOMER') ? 'Bình luận (tùy chọn)' : 'Bình luận'} <span className="text-red-500">{hasRole('CUSTOMER') ? '' : '*'}</span>
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder={hasRole('CUSTOMER') ? 'Chia sẻ trải nghiệm của bạn về sản phẩm này...' : 'Nhập bình luận của bạn...'}
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent resize-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {reviewComment.length}/2000 ký tự
+                </p>
+              </div>
+
+              {hasRole('CUSTOMER') && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Lưu ý:</strong> Chỉ khách hàng đã mua sản phẩm mới có thể đánh giá. Bạn có thể để trống bình luận nếu chỉ muốn đánh giá bằng sao.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowReviewForm(false);
+                    setReviewRating(0);
+                    setReviewComment('');
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={isSubmitting || (hasRole('CUSTOMER') && reviewRating === 0) || (!hasRole('CUSTOMER') && !reviewComment.trim())}
+                >
+                  {isSubmitting ? 'Đang gửi...' : hasReviewed ? 'Cập nhật' : 'Gửi đánh giá'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAuthenticated() && hasRole('CUSTOMER') && !hasPurchased && !hasReviewed && (
+        <div className="border-t border-gray-200 pt-6 mt-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              <strong>Lưu ý:</strong> Bạn cần mua sản phẩm này trước khi có thể đánh giá.
+            </p>
+          </div>
         </div>
       )}
     </div>

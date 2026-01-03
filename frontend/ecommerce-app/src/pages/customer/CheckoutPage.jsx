@@ -121,6 +121,12 @@ const CheckoutPage = () => {
   const discount = checkoutData.discount || calculateTotalDiscount();
   const total = checkoutData.total || (subtotal + shipping - discount);
 
+  const validatePhoneNumber = (phone) => {
+    // Vietnamese phone number pattern: (0|+84) followed by valid carrier prefix and 7 digits
+    const pattern = /^(0|\+84)(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-9]|9[0-9])[0-9]{7}$/;
+    return pattern.test(phone);
+  };
+
   const handlePlaceOrder = async () => {
     // Validate address and phone
     if (!shippingAddress || shippingAddress.trim() === '') {
@@ -130,6 +136,12 @@ const CheckoutPage = () => {
 
     if (!phoneNumber || phoneNumber.trim() === '') {
       alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+
+    // Validate phone number format
+    if (!validatePhoneNumber(phoneNumber.trim())) {
+      alert('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (ví dụ: 0912345678 hoặc +84912345678)');
       return;
     }
 
@@ -235,11 +247,33 @@ const CheckoutPage = () => {
                     <input
                       type="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="Nhập số điện thoại"
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        // Format phone number as user types (Vietnamese format)
+                        // Remove all non-digit characters except + at the start
+                        let cleaned = value.replace(/[^\d+]/g, '');
+                        // If it starts with +84, keep it, otherwise ensure it starts with 0
+                        if (cleaned.startsWith('+84')) {
+                          // Limit to +84 followed by 9 digits
+                          cleaned = '+84' + cleaned.substring(3).replace(/\D/g, '').substring(0, 9);
+                        } else {
+                          // Remove leading + if not +84, ensure starts with 0
+                          cleaned = cleaned.replace(/^\+/, '');
+                          if (cleaned && !cleaned.startsWith('0')) {
+                            cleaned = '0' + cleaned.replace(/^0+/, '');
+                          }
+                          // Limit to 10 digits
+                          cleaned = cleaned.substring(0, 10);
+                        }
+                        setPhoneNumber(cleaned);
+                      }}
+                      placeholder="0912345678 hoặc +84912345678"
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Định dạng: 0912345678 hoặc +84912345678
+                    </p>
                   </div>
                 </div>
               </Card.Content>

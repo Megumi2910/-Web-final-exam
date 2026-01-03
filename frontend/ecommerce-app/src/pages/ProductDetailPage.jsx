@@ -7,6 +7,7 @@ import { ProductGallery, ProductInfo, ProductReviews } from '../components/produ
 import { ProductGrid } from '../components/product';
 import { productApi } from '../services/productApi';
 import { cartApi } from '../services/cartApi';
+import { reviewApi } from '../services/reviewApi';
 import { useAuth } from '../context/AuthContext';
 
 const ProductDetailPage = () => {
@@ -18,6 +19,9 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [ratingDistribution, setRatingDistribution] = useState({});
+  const [averageRating, setAverageRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -60,9 +64,39 @@ const ProductDetailPage = () => {
         }
       }
       
-      // Fetch reviews (if endpoint exists)
-      // Note: Reviews endpoint may need to be implemented
-      setReviews([]);
+      // Fetch reviews and rating statistics
+      try {
+        const [reviewsResponse, ratingResponse, countResponse, distributionResponse] = await Promise.all([
+          reviewApi.getReviewsByProductId(productData.id, 0, 10),
+          reviewApi.getAverageRating(productData.id),
+          reviewApi.getReviewCount(productData.id),
+          reviewApi.getRatingDistribution(productData.id)
+        ]);
+
+        if (reviewsResponse.data.success) {
+          const reviewsData = reviewsResponse.data.data.content || reviewsResponse.data.data || [];
+          setReviews(reviewsData);
+        }
+
+        if (ratingResponse.data.success) {
+          setAverageRating(ratingResponse.data.data || 0);
+        }
+
+        if (countResponse.data.success) {
+          setReviewCount(countResponse.data.data || 0);
+        }
+
+        if (distributionResponse.data.success) {
+          setRatingDistribution(distributionResponse.data.data || {});
+        }
+      } catch (err) {
+        console.error('Failed to fetch reviews:', err);
+        // Set defaults if reviews fail
+        setReviews([]);
+        setAverageRating(0);
+        setReviewCount(0);
+        setRatingDistribution({});
+      }
     } catch (err) {
       console.error('Failed to fetch product:', err);
       setProduct(null);
@@ -291,9 +325,12 @@ const ProductDetailPage = () => {
         <div className="bg-white rounded-lg shopee-shadow p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Đánh giá sản phẩm</h2>
           <ProductReviews
+            productId={product.id}
             reviews={reviews}
-            rating={product.rating || 0}
-            reviewCount={reviews.length}
+            rating={averageRating || product.rating || 0}
+            reviewCount={reviewCount || reviews.length}
+            ratingDistribution={ratingDistribution}
+            onReviewCreated={fetchProduct}
           />
         </div>
 

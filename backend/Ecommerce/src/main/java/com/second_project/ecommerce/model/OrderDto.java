@@ -43,6 +43,13 @@ public class OrderDto {
     private LocalDateTime orderDate;
     private LocalDateTime deliveredDate;
     
+    // Backward compatibility fields for frontend
+    private String customerName;
+    private String customerPhone;
+    private String sellerName;
+    private String storeName;
+    private List<OrderItemDto> orderItems;
+    
     // Alias methods for backward compatibility
     public Long getOrderId() {
         return id;

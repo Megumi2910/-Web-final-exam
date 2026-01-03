@@ -54,11 +54,13 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isShopMenuOpen, setIsShopMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const categoriesRef = useRef(null);
   const userMenuRef = useRef(null);
+  const shopMenuRef = useRef(null);
 
   // Fetch cart count when user is authenticated
   useEffect(() => {
@@ -133,6 +135,9 @@ const Header = () => {
       }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
+      }
+      if (shopMenuRef.current && !shopMenuRef.current.contains(event.target)) {
+        setIsShopMenuOpen(false);
       }
     };
 
@@ -330,7 +335,7 @@ const Header = () => {
                   {isUserMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       <Link
-                        to="/customer/profile"
+                        to={hasRole('ADMIN') ? "/admin/settings#profile" : "/customer/profile"}
                         className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
@@ -345,25 +350,64 @@ const Header = () => {
                         <Settings className="w-4 h-4" />
                         <span className="text-sm">Cài đặt</span>
                       </Link>
-                      {hasRole('ADMIN') && (
-                        <Link
-                          to="/admin/settings"
-                          className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <Settings className="w-4 h-4" />
-                          <span className="text-sm">Admin</span>
-                        </Link>
-                      )}
                       {(hasRole('SELLER') || hasRole('ADMIN')) && (
-                        <Link
-                          to="/seller"
-                          className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <Store className="w-4 h-4" />
-                          <span className="text-sm">Cửa hàng</span>
-                        </Link>
+                        <div className="relative" ref={shopMenuRef}>
+                          <button
+                            onClick={() => setIsShopMenuOpen(!isShopMenuOpen)}
+                            className="flex items-center justify-between gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors w-full text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Store className="w-4 h-4" />
+                              <span className="text-sm">Cửa hàng</span>
+                            </div>
+                            <ChevronDown className={`w-3 h-3 transition-transform ${isShopMenuOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          {isShopMenuOpen && (
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[60]">
+                              {user?.storeName ? (
+                                <Link
+                                  to="/seller"
+                                  className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm"
+                                  onClick={() => {
+                                    setIsShopMenuOpen(false);
+                                    setIsUserMenuOpen(false);
+                                  }}
+                                >
+                                  <Store className="w-4 h-4" />
+                                  <span>{user.storeName}</span>
+                                </Link>
+                              ) : (
+                                <Link
+                                  to="/seller"
+                                  className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm"
+                                  onClick={() => {
+                                    setIsShopMenuOpen(false);
+                                    setIsUserMenuOpen(false);
+                                  }}
+                                >
+                                  <Store className="w-4 h-4" />
+                                  <span>Quản lý cửa hàng</span>
+                                </Link>
+                              )}
+                              {hasRole('ADMIN') && (
+                                <>
+                                  <div className="border-t border-gray-200 my-1"></div>
+                                  <Link
+                                    to="/admin/products"
+                                    className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm"
+                                    onClick={() => {
+                                      setIsShopMenuOpen(false);
+                                      setIsUserMenuOpen(false);
+                                    }}
+                                  >
+                                    <Store className="w-4 h-4" />
+                                    <span>Tất cả cửa hàng</span>
+                                  </Link>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                       <div className="border-t border-gray-200 my-2"></div>
                       <button

@@ -117,12 +117,12 @@ public class OrderRestController {
 
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PageResponse<Order>> getAllOrders(
+    public ResponseEntity<PageResponse<OrderDto>> getAllOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Order> orderPage = orderService.findAll(pageable);
+        Page<OrderDto> orderPage = orderService.findAllDto(pageable);
 
         return ResponseEntity.ok(PageResponse.success(
                 "Orders retrieved successfully",
@@ -136,12 +136,12 @@ public class OrderRestController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Order>> updateOrderStatus(
+    public ResponseEntity<ApiResponse<OrderDto>> updateOrderStatus(
             @PathVariable Long id,
             @RequestParam Order.OrderStatus status) {
 
-        Order order = orderService.updateOrderStatus(id, status);
-        return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", order));
+        OrderDto orderDto = orderService.updateOrderStatusDto(id, status);
+        return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", orderDto));
     }
 
     @GetMapping("/statistics")

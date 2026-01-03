@@ -96,6 +96,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public Order updateOrderStatus(Long orderId, Order.OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
@@ -121,6 +122,13 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("Order {} status updated from {} to {}", orderId, oldStatus, status);
         return savedOrder;
+    }
+
+    @Override
+    @Transactional
+    public OrderDto updateOrderStatusDto(Long orderId, Order.OrderStatus status) {
+        Order order = updateOrderStatus(orderId, status);
+        return convertToDto(order);
     }
 
     @Override
@@ -482,6 +490,16 @@ public class OrderServiceImpl implements OrderService {
         return new PageImpl<>(dtos, pageable, orderPage.getTotalElements());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderDto> findAllDto(Pageable pageable) {
+        Page<Order> orderPage = orderRepository.findAllByOrderByOrderDateDesc(pageable);
+        List<OrderDto> dtos = orderPage.getContent().stream()
+                .map(this::convertToDto)
+                .collect(java.util.stream.Collectors.toList());
+        return new PageImpl<>(dtos, pageable, orderPage.getTotalElements());
+    }
+
     /**
      * Convert Order entity to OrderDto.
      * BEST PRACTICE: Convert entities to DTOs within @Transactional method
@@ -508,12 +526,18 @@ public class OrderServiceImpl implements OrderService {
         dto.setOrderDate(order.getOrderDate());
         dto.setDeliveredDate(order.getDeliveredDate());
 
+        // Backward compatibility: set customer phone from order (not user)
+        dto.setCustomerPhone(order.getPhoneNumber());
+        
         // Flatten user information (lazy-loaded relationship)
         if (order.getUser() != null) {
             User user = order.getUser();
             dto.setUserId(user.getUserId());
-            dto.setUserName(user.getFirstName() + " " + user.getLastName());
+            String fullName = user.getFirstName() + " " + user.getLastName();
+            dto.setUserName(fullName);
             dto.setUserEmail(user.getEmail());
+            // Backward compatibility field
+            dto.setCustomerName(fullName);
         }
 
         // Convert order items to DTOs
@@ -522,6 +546,19 @@ public class OrderServiceImpl implements OrderService {
                     .map(this::convertItemToDto)
                     .collect(java.util.stream.Collectors.toList());
             dto.setItems(itemDtos);
+            // Backward compatibility field
+            dto.setOrderItems(itemDtos);
+            
+            // Extract seller name and store name from first order item (assuming all items from same seller)
+            if (!itemDtos.isEmpty()) {
+                OrderItemDto firstItem = itemDtos.get(0);
+                if (firstItem.getSellerName() != null) {
+                    dto.setSellerName(firstItem.getSellerName());
+                }
+                if (firstItem.getStoreName() != null) {
+                    dto.setStoreName(firstItem.getStoreName());
+                }
+            }
         }
 
         // Convert payment to DTO (flatten circular reference)
@@ -577,6 +614,7 @@ public class OrderServiceImpl implements OrderService {
                 User seller = product.getSeller();
                 dto.setSellerId(seller.getUserId());
                 dto.setSellerName(seller.getFirstName() + " " + seller.getLastName());
+                dto.setStoreName(seller.getStoreName());
             }
         }
 

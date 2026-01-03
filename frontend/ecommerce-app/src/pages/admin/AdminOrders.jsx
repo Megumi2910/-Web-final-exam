@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminApi } from '../../services/adminApi';
 import { 
   Search, 
@@ -60,6 +60,9 @@ const getStatusIcon = (status) => {
 const OrderCard = ({ order, onView, onEdit }) => {
 
   const StatusIcon = getStatusIcon(order.orderStatus);
+  const isEditable = order.orderStatus?.toUpperCase() !== 'CANCELLED' && 
+                     order.orderStatus?.toUpperCase() !== 'DELIVERED' &&
+                     order.orderStatus?.toUpperCase() !== 'COMPLETED';
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -86,8 +89,10 @@ const OrderCard = ({ order, onView, onEdit }) => {
               <Eye className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onEdit(order)}
-              className="p-1 text-gray-400 hover:text-blue-600"
+              onClick={() => isEditable && onEdit(order)}
+              disabled={!isEditable}
+              className={`p-1 ${isEditable ? 'text-gray-400 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
+              title={!isEditable ? 'Không thể chỉnh sửa đơn hàng đã hủy hoặc đã giao' : 'Chỉnh sửa đơn hàng'}
             >
               <Edit className="w-4 h-4" />
             </button>
@@ -114,13 +119,13 @@ const OrderCard = ({ order, onView, onEdit }) => {
           </div>
         )}
 
-        {order.sellerName && (
+        {(order.storeName || order.sellerName) && (
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Store className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Seller:</span>
+              <span className="text-sm text-gray-600">Cửa hàng:</span>
             </div>
-            <span className="text-sm font-medium text-gray-900">{order.sellerName}</span>
+            <span className="text-sm font-medium text-gray-900">{order.storeName || order.sellerName}</span>
           </div>
         )}
 
@@ -152,7 +157,11 @@ const OrderCard = ({ order, onView, onEdit }) => {
 const AdminOrders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterShop, setFilterShop] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [updating, setUpdating] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -188,14 +197,30 @@ const AdminOrders = () => {
     }
   };
 
+  // Extract unique shops from orders
+  const shops = useMemo(() => {
+    const shopSet = new Set();
+    orders.forEach(order => {
+      const shopName = order.storeName || order.sellerName;
+      if (shopName) {
+        shopSet.add(shopName);
+      }
+    });
+    return Array.from(shopSet).sort();
+  }, [orders]);
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.id?.toString().includes(searchQuery) ||
                          order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          order.customerPhone?.includes(searchQuery) ||
-                         order.sellerName?.toLowerCase().includes(searchQuery.toLowerCase());
+                         order.sellerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         order.storeName?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || 
                          order.orderStatus?.toLowerCase() === filterStatus.toLowerCase();
-    return matchesSearch && matchesStatus;
+    const matchesShop = filterShop === 'all' || 
+                       (order.storeName && order.storeName === filterShop) ||
+                       (!order.storeName && order.sellerName && order.sellerName === filterShop);
+    return matchesSearch && matchesStatus && matchesShop;
   });
 
   const handleView = (order) => {
@@ -203,7 +228,32 @@ const AdminOrders = () => {
   };
 
   const handleEdit = (order) => {
-    console.log('Edit order:', order);
+    if (order.orderStatus?.toUpperCase() === 'CANCELLED' || 
+        order.orderStatus?.toUpperCase() === 'DELIVERED' ||
+        order.orderStatus?.toUpperCase() === 'COMPLETED') {
+      return; // Do nothing for cancelled or delivered/completed orders
+    }
+    setEditingOrder(order);
+    setNewStatus(order.orderStatus || '');
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!editingOrder || !newStatus) return;
+
+    try {
+      setUpdating(true);
+      setError(null);
+      await adminApi.updateOrderStatus(editingOrder.id, newStatus);
+      setEditingOrder(null);
+      setNewStatus('');
+      // Refresh orders list
+      await fetchOrders();
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      setError(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái đơn hàng');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const stats = {
@@ -299,6 +349,16 @@ const AdminOrders = () => {
               <option value="SHIPPING">Đang giao</option>
               <option value="DELIVERED">Đã giao</option>
               <option value="CANCELLED">Đã hủy</option>
+            </select>
+            <select
+              value={filterShop}
+              onChange={(e) => setFilterShop(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">Tất cả cửa hàng</option>
+              {shops.map((shop, index) => (
+                <option key={index} value={shop}>{shop}</option>
+              ))}
             </select>
             <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2">
               <Filter className="w-4 h-4" />
@@ -400,8 +460,8 @@ const AdminOrders = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Seller</label>
-                  <p className="text-gray-900">{selectedOrder.sellerName || 'N/A'}</p>
+                  <label className="text-sm font-medium text-gray-500">Cửa hàng</label>
+                  <p className="text-gray-900">{selectedOrder.storeName || selectedOrder.sellerName || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Trạng thái</label>
@@ -438,8 +498,82 @@ const AdminOrders = () => {
               >
                 Đóng
               </button>
-              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                Cập nhật trạng thái
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Status Modal */}
+      {editingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Cập nhật trạng thái đơn hàng</h3>
+              <button
+                onClick={() => {
+                  setEditingOrder(null);
+                  setNewStatus('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={updating}
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Đơn hàng #{editingOrder.id}
+                </label>
+                <p className="text-sm text-gray-500">
+                  Trạng thái hiện tại: <span className="font-medium">{getStatusText(editingOrder.orderStatus)}</span>
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Trạng thái mới
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  disabled={updating}
+                >
+                  <option value="">-- Chọn trạng thái --</option>
+                  <option value="PENDING">Chờ xác nhận</option>
+                  <option value="CONFIRMED">Đã xác nhận</option>
+                  <option value="PROCESSING">Đang xử lý</option>
+                  <option value="COMPLETED">Hoàn thành</option>
+                </select>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setEditingOrder(null);
+                  setNewStatus('');
+                  setError(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={updating}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleUpdateStatus}
+                disabled={updating || !newStatus || newStatus === editingOrder.orderStatus}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updating ? 'Đang cập nhật...' : 'Cập nhật'}
               </button>
             </div>
           </div>

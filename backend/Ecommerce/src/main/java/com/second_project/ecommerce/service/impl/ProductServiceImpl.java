@@ -241,7 +241,8 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductDto> searchProductsDtos(String keyword, Pageable pageable) {
-        Page<Product> productPage = productRepository.findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(keyword, keyword, pageable);
+        // Only show APPROVED products in public search (exclude DISCONTINUED, PENDING, REJECTED, OUT_OF_STOCK)
+        Page<Product> productPage = productRepository.searchByKeyword(keyword, Product.ProductStatus.APPROVED, pageable);
         List<ProductDto> dtos = productPage.getContent().stream()
                 .map(this::convertToDtoSafe)
                 .collect(Collectors.toList());
@@ -333,6 +334,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductDto> findBySellerIdDtos(Long sellerId, Pageable pageable) {
+        // Show only APPROVED products for public shop page
         Page<Product> productPage = productRepository.findBySellerIdAndStatus(sellerId, Product.ProductStatus.APPROVED, pageable);
         List<ProductDto> dtos = productPage.getContent().stream()
                 .map(this::convertToDto)
@@ -493,12 +495,26 @@ public class ProductServiceImpl implements ProductService {
                     // Continue without seller info - this is not critical
                 }
 
-                // Fetch category IDs using separate query
+                // Fetch category IDs and populate categories list
                 try {
                     List<Long> categoryIds = productRepository.findCategoryIdsByProductId(productId);
                     if (categoryIds != null && !categoryIds.isEmpty()) {
                         // Create a new HashSet to avoid any concurrent modification issues during serialization
                         dto.setCategoryIds(new java.util.HashSet<>(categoryIds));
+                        
+                        // Populate categories list with CategoryDto objects for frontend use
+                        List<com.second_project.ecommerce.model.CategoryDto> categoryDtos = categoryIds.stream()
+                                .map(categoryId -> {
+                                    try {
+                                        return categoryService.findDtoById(categoryId);
+                                    } catch (Exception e) {
+                                        log.warn("Failed to load category {} for product {}: {}", categoryId, productId, e.getMessage());
+                                        return null;
+                                    }
+                                })
+                                .filter(cat -> cat != null)
+                                .collect(Collectors.toList());
+                        dto.setCategories(categoryDtos);
                     }
                 } catch (Exception e) {
                     log.warn("Failed to load categories for product {}: {}", productId, e.getMessage());

@@ -62,9 +62,16 @@ const SearchPage = () => {
     image: product.images && product.images.length > 0 
       ? product.images[0] 
       : 'https://via.placeholder.com/300',
-    shop: product.seller?.fullName || product.seller?.email || 'Shop',
+    shop: product.sellerName || product.seller?.fullName || product.seller?.email || 'Shop',
+    categoryIds: product.categoryIds 
+      ? (Array.isArray(product.categoryIds) 
+          ? product.categoryIds 
+          : Array.from(product.categoryIds))
+      : (product.categories && product.categories.length > 0 
+          ? product.categories.map(cat => cat.id || (typeof cat === 'object' ? cat.id : cat))
+          : []),
     category: product.categories && product.categories.length > 0 
-      ? product.categories[0].slug || product.categories[0].name.toLowerCase() 
+      ? product.categories[0].slug || product.categories[0].name?.toLowerCase() 
       : '',
     location: '', // Not available in current Product entity
     freeShipping: false, // Not available in current Product entity
@@ -114,10 +121,48 @@ const SearchPage = () => {
   const filteredProducts = products.filter(product => {
     // Category filter - check if product belongs to selected category
     if (filters.category) {
-      const categoryMatch = product.category === filters.category || 
-                           product.category?.toLowerCase() === filters.category.toLowerCase();
-      if (!categoryMatch) {
-        return false;
+      const selectedCategory = categories.find(cat => 
+        (cat.slug || cat.name?.toLowerCase()) === filters.category
+      );
+      
+      if (selectedCategory) {
+        // Check by category ID (most reliable) - handle both Set and Array
+        let hasCategoryId = false;
+        if (product.categoryIds) {
+          if (Array.isArray(product.categoryIds)) {
+            hasCategoryId = product.categoryIds.includes(selectedCategory.id);
+          } else if (product.categoryIds instanceof Set) {
+            hasCategoryId = product.categoryIds.has(selectedCategory.id);
+          } else if (typeof product.categoryIds === 'object' && product.categoryIds.size !== undefined) {
+            // Handle Set-like objects
+            hasCategoryId = Array.from(product.categoryIds).includes(selectedCategory.id);
+          }
+        }
+        
+        // Also check by categories array (if populated)
+        let hasCategoryInList = false;
+        if (product.categories && Array.isArray(product.categories)) {
+          hasCategoryInList = product.categories.some(cat => 
+            cat.id === selectedCategory.id || 
+            (cat.slug && cat.slug === selectedCategory.slug) ||
+            (cat.name && cat.name.toLowerCase() === selectedCategory.name?.toLowerCase())
+          );
+        }
+        
+        // Also check by slug/name for backward compatibility
+        const hasCategorySlug = product.category === filters.category || 
+          product.category?.toLowerCase() === filters.category.toLowerCase();
+        
+        if (!hasCategoryId && !hasCategoryInList && !hasCategorySlug) {
+          return false;
+        }
+      } else {
+        // Fallback: if category not found in list, use slug/name matching
+        const categoryMatch = product.category === filters.category || 
+                             product.category?.toLowerCase() === filters.category.toLowerCase();
+        if (!categoryMatch) {
+          return false;
+        }
       }
     }
 
