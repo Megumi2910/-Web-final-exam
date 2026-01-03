@@ -2,18 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui';
+import Toast from '../components/ui/Toast';
 import { ProductGallery, ProductInfo, ProductReviews } from '../components/product';
 import { ProductGrid } from '../components/product';
 import { productApi } from '../services/productApi';
+import { cartApi } from '../services/cartApi';
+import { useAuth } from '../context/AuthContext';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     fetchProduct();
@@ -64,9 +70,91 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleAddToCart = (productData) => {
-    console.log('Added to cart:', productData);
-    // TODO: Implement add to cart logic
+  const handleAddToCart = async (productData) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: `/product/${id}` } });
+      return;
+    }
+
+    try {
+      const quantity = productData.quantity || 1;
+      await cartApi.addToCart(productData.id, quantity);
+      // Show toast banner instead of alert
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      // Trigger cart count refresh in header by dispatching custom event
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
+  };
+
+  const handleBuyNow = async (productData) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: `/product/${id}` } });
+      return;
+    }
+
+    try {
+      const quantity = productData.quantity || 1;
+      await cartApi.buyNow(productData.id, quantity);
+      
+      // Fetch cart to get the added item
+      const cartResponse = await cartApi.getCart();
+      if (cartResponse.data.success) {
+        const cart = cartResponse.data.data;
+        
+        // Group items by seller for checkout format
+        // CartItemDto has flattened product fields
+        const itemsBySeller = {};
+        
+        cart.items?.forEach(item => {
+          const sellerId = item.sellerId || 0;
+          const sellerName = item.sellerName || 'Shop';
+          
+          if (!itemsBySeller[sellerId]) {
+            itemsBySeller[sellerId] = {
+              shopId: sellerId,
+              shopName: sellerName,
+              products: []
+            };
+          }
+          
+          itemsBySeller[sellerId].products.push({
+            id: item.id, // cart item ID
+            productId: item.productId,
+            name: item.productName || 'Product',
+            image: item.productImageUrl || item.productImages?.[0] || 'https://via.placeholder.com/100',
+            variant: item.productVariant || 'Default',
+            price: parseFloat(item.unitPrice || item.totalPrice || item.productPrice || 0),
+            originalPrice: parseFloat(item.productOriginalPrice || item.productPrice || 0),
+            quantity: item.quantity,
+            stock: item.productStock || 0,
+            freeShip: false
+          });
+        });
+        
+        // Format cart data for checkout page
+        const checkoutData = {
+          cartItems: Object.values(itemsBySeller),
+          subtotal: parseFloat(cart.totalAmount || 0),
+          shipping: 0, // Will be calculated on checkout page
+          discount: 0,
+          total: parseFloat(cart.totalAmount || 0)
+        };
+        
+        // Navigate to checkout with formatted data
+        navigate('/checkout', { state: checkoutData });
+      } else {
+        // Fallback: just navigate to checkout
+        navigate('/checkout');
+      }
+    } catch (error) {
+      console.error('Failed to buy now:', error);
+      alert(error.response?.data?.message || 'Không thể thực hiện mua ngay');
+    }
   };
 
   const handleToggleWishlist = (productData) => {
@@ -106,6 +194,15 @@ const ProductDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={1000}
+        />
+      )}
+      
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -133,6 +230,7 @@ const ProductDetailPage = () => {
           <ProductInfo
             product={product}
             onAddToCart={handleAddToCart}
+            onBuyNow={handleBuyNow}
             onToggleWishlist={handleToggleWishlist}
             isWishlisted={isWishlisted}
           />

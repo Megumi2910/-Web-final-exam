@@ -43,7 +43,15 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
         isNew: product.isNew || false,
         status: product.status || 'PENDING'
       });
-      if (product.categories) {
+      // Handle both categoryIds (Set/Array) and categories (array of objects)
+      if (product.categoryIds) {
+        // categoryIds can be Set or Array
+        const categoryIdsArray = Array.isArray(product.categoryIds) 
+          ? product.categoryIds 
+          : Array.from(product.categoryIds || []);
+        setSelectedCategories(categoryIdsArray);
+      } else if (product.categories && Array.isArray(product.categories)) {
+        // categories is array of objects with id property
         setSelectedCategories(product.categories.map(c => c.id || c));
       }
     } else if (isAdmin) {
@@ -65,6 +73,36 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
       setLoadingCategories(false);
     }
   };
+
+  // Set selected categories when both product and categories are available
+  // This runs after categories are loaded to ensure proper initialization
+  useEffect(() => {
+    if (product && categories.length > 0) {
+      // Handle both categoryIds (Set/Array) and categories (array of objects)
+      let categoryIdsToSet = [];
+      
+      if (product.categoryIds) {
+        // categoryIds can be Set or Array
+        categoryIdsToSet = Array.isArray(product.categoryIds) 
+          ? product.categoryIds 
+          : Array.from(product.categoryIds || []);
+      } else if (product.categories && Array.isArray(product.categories)) {
+        // categories is array of objects with id property
+        categoryIdsToSet = product.categories.map(c => c.id || c);
+      }
+      
+      // Set categories if we found any
+      if (categoryIdsToSet.length > 0) {
+        setSelectedCategories(prev => {
+          // Only update if different to avoid unnecessary re-renders
+          const prevSorted = [...prev].sort((a, b) => a - b).join(',');
+          const newSorted = [...categoryIdsToSet].sort((a, b) => a - b).join(',');
+          return prevSorted === newSorted ? prev : categoryIdsToSet;
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, categories.length]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -126,10 +164,6 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
       newErrors.price = 'Giá sản phẩm phải lớn hơn 0';
     }
     
-    if (formData.originalPrice && parseFloat(formData.originalPrice) <= parseFloat(formData.price || 0)) {
-      newErrors.originalPrice = 'Giá gốc phải lớn hơn giá bán';
-    }
-    
     if (formData.stock < 0) {
       newErrors.stock = 'Số lượng tồn kho không được âm';
     }
@@ -167,7 +201,9 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
         isFeatured: formData.isFeatured,
         isHot: formData.isHot,
         isNew: formData.isNew,
-        status: formData.status,
+        // Don't send status in regular updates - status should only be changed via approve/reject endpoints
+        // This prevents accidental status reverts when editing other product fields
+        // status: formData.status, // Removed to prevent accidental status changes
         categories: selectedCategories.map(id => ({ id }))
       };
 
@@ -296,7 +332,7 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Giá gốc
+                  Giá nhập hàng
                 </label>
                 <input
                   type="number"

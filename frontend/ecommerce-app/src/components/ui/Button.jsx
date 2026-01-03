@@ -36,12 +36,19 @@ const Button = ({
     className
   );
   
+  const handleClick = (e) => {
+    if (disabled) return;
+    if (onClick) {
+      onClick(e);
+    }
+  };
+
   return (
     <button
       type={type}
       className={classes}
       disabled={disabled}
-      onClick={onClick}
+      onClick={handleClick}
       {...props}
     >
       {children}

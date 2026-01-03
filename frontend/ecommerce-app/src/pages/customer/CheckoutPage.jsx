@@ -4,60 +4,39 @@ import {
   CreditCard, 
   FileText,
   ChevronRight,
-  Edit2,
-  Plus,
-  Check,
   Truck,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Check
 } from 'lucide-react';
 import { Button, Badge, Card } from '../../components/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
+import { orderApi } from '../../services/orderApi';
 
 const CheckoutPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [selectedAddress, setSelectedAddress] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState('cod');
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedPayment, setSelectedPayment] = useState('COD');
   const [note, setNote] = useState('');
-  const [showAddressModal, setShowAddressModal] = useState(false);
-
-  // Addresses state - initialized empty, users can add addresses
-  const [addresses, setAddresses] = useState([]);
-
-  // State cho form thêm địa chỉ
-  const [newAddress, setNewAddress] = useState({
-    name: '',
-    fullName: '',
-    phone: '',
-    address: '',
-    city: '',
-    isDefault: false
-  });
 
   // Lấy data từ router state (từ giỏ hàng)
   const checkoutData = location.state;
   
-  // Initialize with user info if available (optional default address)
+  // Initialize with user info if available
   useEffect(() => {
-    if (user && user.fullName && addresses.length === 0) {
-      // Create a default address from user info if available
-      const defaultAddress = {
-        id: 1,
-        name: 'Địa chỉ mặc định',
-        fullName: user.fullName || '',
-        phone: user.phone || '',
-        address: user.address || '',
-        city: user.city || 'TP. Hồ Chí Minh',
-        isDefault: true
-      };
-      // Only add if user has at least name
-      if (defaultAddress.fullName) {
-        setAddresses([defaultAddress]);
-        setSelectedAddress(1);
+    if (user) {
+      // Set default address from user profile
+      if (user.address) {
+        setShippingAddress(user.address);
+      }
+      // Set default phone number from user profile
+      if (user.phoneNumber) {
+        setPhoneNumber(user.phoneNumber);
       }
     }
   }, [user]);
@@ -91,29 +70,16 @@ const CheckoutPage = () => {
 
   const paymentMethods = [
     {
-      id: 'cod',
+      id: 'COD',
       name: 'Thanh toán khi nhận hàng (COD)',
       description: 'Thanh toán bằng tiền mặt khi nhận hàng',
       icon: Truck,
       recommended: true
     },
     {
-      id: 'momo',
-      name: 'Ví MoMo',
-      description: 'Thanh toán qua ví điện tử MoMo',
-      icon: CreditCard,
-      discount: 50000
-    },
-    {
-      id: 'banking',
-      name: 'Chuyển khoản ngân hàng',
-      description: 'Chuyển khoản qua Internet Banking',
-      icon: CreditCard
-    },
-    {
-      id: 'card',
-      name: 'Thẻ tín dụng/Ghi nợ',
-      description: 'Visa, Mastercard, JCB',
+      id: 'QR',
+      name: 'Thanh toán qua mã QR',
+      description: 'Quét mã QR để thanh toán qua ngân hàng',
       icon: CreditCard
     }
   ];
@@ -145,12 +111,7 @@ const CheckoutPage = () => {
       }
     });
     
-    // Add payment method discount
-    const paymentMethod = paymentMethods.find(m => m.id === selectedPayment);
-    if (paymentMethod?.discount) {
-      discount += paymentMethod.discount;
-    }
-    
+    // No payment method discounts for COD/QR
     return discount;
   };
 
@@ -160,61 +121,43 @@ const CheckoutPage = () => {
   const discount = checkoutData.discount || calculateTotalDiscount();
   const total = checkoutData.total || (subtotal + shipping - discount);
 
-  // Xử lý thêm địa chỉ mới
-  const handleAddAddress = (e) => {
-    e.preventDefault();
-    
-    // Validate form
-    if (!newAddress.fullName || !newAddress.phone || !newAddress.address || !newAddress.city) {
-      alert('Vui lòng điền đầy đủ thông tin');
+  const handlePlaceOrder = async () => {
+    // Validate address and phone
+    if (!shippingAddress || shippingAddress.trim() === '') {
+      alert('Vui lòng nhập địa chỉ giao hàng');
       return;
     }
 
-    // Tạo địa chỉ mới
-    const nextId = addresses.length > 0 ? Math.max(...addresses.map(a => a.id)) + 1 : 1;
-    const addressToAdd = {
-      id: nextId,
-      name: newAddress.name || 'Địa chỉ mới',
-      fullName: newAddress.fullName,
-      phone: newAddress.phone,
-      address: newAddress.address,
-      city: newAddress.city,
-      isDefault: newAddress.isDefault || addresses.length === 0
-    };
-
-    // Nếu địa chỉ mới là mặc định, cập nhật các địa chỉ cũ
-    let updatedAddresses = addresses;
-    if (newAddress.isDefault) {
-      updatedAddresses = addresses.map(addr => ({ ...addr, isDefault: false }));
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      alert('Vui lòng nhập số điện thoại');
+      return;
     }
 
-    // Thêm địa chỉ mới vào danh sách
-    setAddresses([...updatedAddresses, addressToAdd]);
-    
-    // Tự động chọn địa chỉ mới
-    setSelectedAddress(addressToAdd.id);
+    try {
+      const response = await orderApi.checkout({
+        shippingAddress: shippingAddress.trim(),
+        phoneNumber: phoneNumber.trim(),
+        paymentMethod: selectedPayment,
+        notes: note || ''
+      });
 
-    // Reset form và đóng modal
-    setNewAddress({
-      name: '',
-      fullName: '',
-      phone: '',
-      address: '',
-      city: '',
-      isDefault: false
-    });
-    setShowAddressModal(false);
-  };
-
-  const handlePlaceOrder = () => {
-    console.log('Placing order:', {
-      address: addresses.find(a => a.id === selectedAddress),
-      payment: selectedPayment,
-      note,
-      items: orderItems,
-      total
-    });
-    // TODO: Process order
+      if (response.data.success) {
+        const order = response.data.data;
+        
+        // If QR payment, redirect to order details with QR code
+        if (selectedPayment === 'QR') {
+          navigate(`/orders/${order.id}?showQR=true`);
+        } else {
+          // COD - redirect to order confirmation
+          navigate(`/orders/${order.id}`, {
+            state: { orderPlaced: true }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to place order:', error);
+      alert(error.response?.data?.message || 'Không thể đặt hàng. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -252,70 +195,42 @@ const CheckoutPage = () => {
             {/* Delivery Address */}
             <Card>
               <Card.Header>
-                <div className="flex items-center justify-between">
-                  <Card.Title className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-shopee-orange" />
-                    Địa chỉ giao hàng
-                  </Card.Title>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowAddressModal(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Thêm mới
-                  </Button>
-                </div>
+                <Card.Title className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-shopee-orange" />
+                  Địa chỉ giao hàng
+                </Card.Title>
               </Card.Header>
               <Card.Content>
-                <div className="space-y-3">
-                  {addresses.map((address) => (
-                    <div
-                      key={address.id}
-                      onClick={() => setSelectedAddress(address.id)}
-                      className={clsx(
-                        'p-4 border-2 rounded-lg cursor-pointer transition-all',
-                        selectedAddress === address.id
-                          ? 'border-shopee-orange bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={clsx(
-                            'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5',
-                            selectedAddress === address.id
-                              ? 'border-shopee-orange bg-shopee-orange'
-                              : 'border-gray-300'
-                          )}>
-                            {selectedAddress === address.id && (
-                              <Check className="w-3 h-3 text-white" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-medium text-gray-900">
-                                {address.fullName}
-                              </span>
-                              <span className="text-gray-500">|</span>
-                              <span className="text-gray-600">{address.phone}</span>
-                              {address.isDefault && (
-                                <Badge variant="primary" size="sm">Mặc định</Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <div>{address.address}</div>
-                              <div>{address.city}</div>
-                            </div>
-                          </div>
-                        </div>
-                        <button className="text-sm text-shopee-orange hover:text-shopee-orange-dark flex items-center gap-1">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Địa chỉ <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={shippingAddress}
+                      onChange={(e) => setShippingAddress(e.target.value)}
+                      placeholder="Nhập địa chỉ giao hàng (VD: 123 Đường ABC, Phường XYZ, Quận 1, TP. Hồ Chí Minh)"
+                      rows={3}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Địa chỉ này sẽ được sử dụng làm địa chỉ giao hàng mặc định
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Số điện thoại <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="Nhập số điện thoại"
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
+                    />
+                  </div>
                 </div>
               </Card.Content>
             </Card>
@@ -561,128 +476,6 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      {/* Modal thêm địa chỉ mới */}
-      {showAddressModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-bold text-gray-900">Thêm địa chỉ mới</h2>
-            </div>
-            
-            <form onSubmit={handleAddAddress} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nhãn địa chỉ (không bắt buộc)
-                </label>
-                <input
-                  type="text"
-                  value={newAddress.name}
-                  onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
-                  placeholder="VD: Nhà riêng, Văn phòng..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Họ và tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newAddress.fullName}
-                  onChange={(e) => setNewAddress({ ...newAddress, fullName: e.target.value })}
-                  placeholder="Nhập họ và tên"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số điện thoại <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={newAddress.phone}
-                  onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-                  placeholder="Nhập số điện thoại"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Địa chỉ cụ thể <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newAddress.address}
-                  onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
-                  placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tỉnh/Thành phố <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newAddress.city}
-                  onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                  placeholder="VD: TP. Hồ Chí Minh"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-shopee-orange focus:border-transparent"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isDefault"
-                  checked={newAddress.isDefault}
-                  onChange={(e) => setNewAddress({ ...newAddress, isDefault: e.target.checked })}
-                  className="w-4 h-4 text-shopee-orange rounded focus:ring-shopee-orange"
-                />
-                <label htmlFor="isDefault" className="text-sm text-gray-700">
-                  Đặt làm địa chỉ mặc định
-                </label>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowAddressModal(false);
-                    setNewAddress({
-                      name: '',
-                      fullName: '',
-                      phone: '',
-                      address: '',
-                      city: '',
-                      isDefault: false
-                    });
-                  }}
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  className="flex-1"
-                >
-                  Thêm địa chỉ
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

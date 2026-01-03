@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Star, Truck, Shield, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui';
 import { ProductGrid, CategoryCard } from '../components/product';
@@ -6,6 +7,7 @@ import { categoryApi } from '../services/categoryApi';
 import { productApi } from '../services/productApi';
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const [currentBanner, setCurrentBanner] = useState(0);
   const [wishlistItems, setWishlistItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -35,18 +37,24 @@ const HomePage = () => {
       // Fetch featured products
       const featuredResponse = await productApi.getFeaturedProducts(8);
       if (featuredResponse.data.success) {
-        setFeaturedProducts(featuredResponse.data.data.map(product => ({
+        const products = featuredResponse.data.data || [];
+        setFeaturedProducts(products.map(product => ({
           id: product.id,
           name: product.name,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          discount: product.discount,
+          price: product.price ? parseFloat(product.price) : 0,
+          originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
+          discount: product.originalPrice && product.price 
+            ? Math.round(((parseFloat(product.originalPrice) - parseFloat(product.price)) / parseFloat(product.originalPrice)) * 100)
+            : 0,
           rating: product.averageRating || 0,
           reviewCount: product.reviewCount || 0,
-          image: product.images?.[0] || 'https://via.placeholder.com/300',
-          shop: product.sellerName || 'Shop',
+          image: product.imageUrls && product.imageUrls.length > 0 
+            ? product.imageUrls[0] 
+            : product.imageUrl || 'https://via.placeholder.com/300',
+          shop: product.sellerName || product.seller?.fullName || 'Shop',
           isNew: product.isNew || false,
-          isHot: product.isHot || false
+          isHot: product.isHot || false,
+          slug: product.slug
         })));
       }
 
@@ -110,8 +118,13 @@ const HomePage = () => {
   };
 
   const handleCategoryClick = (category) => {
-    console.log('Category clicked:', category);
-    // TODO: Navigate to category page
+    if (category && category.id) {
+      navigate(`/category/${category.id}`, { 
+        state: { categoryName: category.name } 
+      });
+    } else if (category && category.slug) {
+      navigate(`/category/${category.slug}`);
+    }
   };
 
   if (loading) {

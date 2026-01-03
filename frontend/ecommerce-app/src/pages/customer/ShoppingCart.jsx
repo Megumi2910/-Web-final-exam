@@ -47,8 +47,9 @@ const ShoppingCart = () => {
         const itemsBySeller = {};
         
         cart.items?.forEach(item => {
-          const sellerId = item.product?.sellerId || 0;
-          const sellerName = item.product?.sellerName || 'Shop';
+          // CartItemDto has flattened product fields
+          const sellerId = item.sellerId || 0;
+          const sellerName = item.sellerName || 'Shop';
           
           if (!itemsBySeller[sellerId]) {
             itemsBySeller[sellerId] = {
@@ -60,14 +61,14 @@ const ShoppingCart = () => {
           
           itemsBySeller[sellerId].products.push({
             id: item.id, // cart item ID
-            productId: item.product?.id,
-            name: item.product?.name || 'Unknown Product',
-            image: item.product?.images?.[0] || 'https://via.placeholder.com/100',
+            productId: item.productId,
+            name: item.productName || 'Unknown Product',
+            image: item.productImageUrl || item.productImages?.[0] || 'https://via.placeholder.com/100',
             variant: item.productVariant || 'Default',
-            price: item.price,
-            originalPrice: item.product?.originalPrice || item.price,
+            price: parseFloat(item.unitPrice || item.totalPrice || item.productPrice || 0),
+            originalPrice: parseFloat(item.productOriginalPrice || item.productPrice || item.unitPrice || 0),
             quantity: item.quantity,
-            stock: item.product?.stock || 0,
+            stock: item.productStock || 0,
             freeShip: false // TODO: Add freeShip logic from backend
           });
         });
@@ -93,10 +94,12 @@ const ShoppingCart = () => {
     if (newQuantity < 1) return;
     
     try {
-      const response = await cartApi.updateCartItem(cartItemId, { quantity: newQuantity });
+      const response = await cartApi.updateCartItem(cartItemId, newQuantity);
       if (response.data.success) {
         // Refresh cart after update
         await fetchCart();
+        // Trigger cart count refresh in header
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
         // Update selected items if needed
         const itemKey = `${shopId}-${cartItemId}`;
         if (newQuantity === 0 && selectedItems.includes(itemKey)) {
@@ -368,17 +371,29 @@ const ShoppingCart = () => {
                             />
 
                             {/* Image */}
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="w-20 h-20 object-cover rounded-lg"
-                            />
+                            <Link 
+                              to={`/product/${product.productId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="block"
+                            >
+                              <img
+                                src={product.image}
+                                alt={product.name}
+                                className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                              />
+                            </Link>
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 mb-1 line-clamp-2">
-                                {product.name}
-                              </h4>
+                              <Link
+                                to={`/product/${product.productId}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="block"
+                              >
+                                <h4 className="font-medium text-gray-900 mb-1 line-clamp-2 cursor-pointer hover:text-shopee-orange transition-colors">
+                                  {product.name}
+                                </h4>
+                              </Link>
                               <p className="text-sm text-gray-500 mb-2">
                                 {product.variant}
                               </p>

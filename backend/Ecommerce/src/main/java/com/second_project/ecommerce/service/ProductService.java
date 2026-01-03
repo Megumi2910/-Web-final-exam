@@ -34,7 +34,11 @@ public interface ProductService {
     Optional<ProductDto> findDtoById(Long id);
     Optional<ProductDto> findDtoBySlug(String slug);
     List<ProductDto> findFeaturedProductsDtos();
+    List<ProductDto> findFeaturedProductsDtos(int limit);
     List<ProductDto> findNewProductsDtos();
+    List<ProductDto> findNewProductsDtos(int limit);
+    List<ProductDto> findHotProductsDtos(int limit);
+    Page<ProductDto> findByCategoryIdDtos(Long categoryId, Pageable pageable);
     Page<ProductDto> findPendingProductsDtos(Pageable pageable);
     ProductDto saveDto(ProductDto productDto);
     ProductDto updateDto(Long id, ProductDto productDto);

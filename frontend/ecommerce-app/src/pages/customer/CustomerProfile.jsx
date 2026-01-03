@@ -114,7 +114,8 @@ const CustomerProfile = () => {
     try {
       await userApi.updateProfile({
         firstName: formData.firstName,
-        lastName: formData.lastName
+        lastName: formData.lastName,
+        address: formData.address
       });
       // Refresh user data in auth context
       await refreshUser();
@@ -365,12 +366,19 @@ const CustomerProfile = () => {
                         name="address"
                         value={formData.address}
                         onChange={handleChange}
-                        disabled={true}
+                        disabled={!isEditing}
                         rows={3}
-                        className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-lg"
-                        placeholder="Chưa cập nhật"
+                        className={clsx(
+                          'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange',
+                          isEditing ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50'
+                        )}
+                        placeholder="Nhập địa chỉ của bạn"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Địa chỉ không thể thay đổi tại đây</p>
+                      {isEditing && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Địa chỉ này sẽ được sử dụng làm địa chỉ giao hàng mặc định
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

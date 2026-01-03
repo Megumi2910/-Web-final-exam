@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   Package, 
   Clock, 
@@ -17,6 +17,7 @@ import { Button, Badge, Card } from '../../components/ui';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { orderApi } from '../../services/orderApi';
+import CancelOrderModal from '../../components/order/CancelOrderModal';
 
 const CustomerOrders = () => {
   const navigate = useNavigate();
@@ -26,6 +27,9 @@ const CustomerOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -43,25 +47,32 @@ const CustomerOrders = () => {
       setError(null);
       const response = await orderApi.getMyOrders(0, 100); // Fetch more orders to allow filtering
       if (response.data.success) {
-        const ordersData = response.data.data.content || [];
+        // PageResponse extends ApiResponse<List<T>>, so data is directly in response.data.data
+        const ordersData = response.data.data || [];
+        console.log('Orders data:', ordersData); // Debug log
         // Transform orders to match component structure
+        // OrderDto has items array, not orderItems
         const transformedOrders = ordersData.map(order => ({
           id: order.id,
-          date: order.createdAt,
+          orderNumber: order.orderNumber || order.id,
+          date: order.orderDate || order.createdAt,
           status: mapOrderStatus(order.orderStatus, order.deliveryStatus),
-          items: order.orderItems?.map(item => ({
+          items: order.items?.map(item => ({
             id: item.id,
-            name: item.productName,
-            image: item.productImage || 'https://via.placeholder.com/100',
+            name: item.productName || 'Product',
+            image: item.productImageUrl || item.productImages?.[0] || 'https://via.placeholder.com/100',
             variant: item.productVariant || 'Default',
             quantity: item.quantity,
-            price: item.price
+            unitPrice: parseFloat(item.unitPrice || 0),
+            totalPrice: parseFloat(item.totalPrice || (item.unitPrice * item.quantity) || 0)
           })) || [],
-          shipping: order.shippingFee || 0,
-          total: order.totalAmount,
-          shop: order.sellerName || 'Shop',
-          trackingNumber: order.trackingNumber || null,
-          estimatedDelivery: order.estimatedDeliveryDate || null
+          shipping: parseFloat(order.shippingFee || 0),
+          total: parseFloat(order.totalAmount || 0),
+          shop: 'Shop', // Orders can have multiple sellers, using generic shop name
+          trackingNumber: null, // TODO: Add tracking number to OrderDto if needed
+          estimatedDelivery: null, // TODO: Add estimated delivery to OrderDto if needed
+          payment: order.payment, // Include payment info for display
+          cancellationReason: order.cancellationReason // Include cancellation reason
         }));
         
         setOrders(transformedOrders);
@@ -82,14 +93,21 @@ const CustomerOrders = () => {
     return 'pending';
   };
 
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
-      return;
-    }
+  const handleCancelOrderClick = (orderId, orderNumber) => {
+    setSelectedOrderId(orderId);
+    setSelectedOrderNumber(orderNumber);
+    setCancelModalOpen(true);
+  };
+
+  const handleCancelConfirm = async (reason) => {
+    if (!selectedOrderId) return;
     
     try {
-      const response = await orderApi.cancelOrder(orderId);
+      const response = await orderApi.cancelOrder(selectedOrderId, reason);
       if (response.data.success) {
+        setCancelModalOpen(false);
+        setSelectedOrderId(null);
+        setSelectedOrderNumber(null);
         // Refresh orders
         await fetchOrders();
       }
@@ -290,12 +308,15 @@ const CustomerOrders = () => {
                 <div className="p-4 bg-gray-50 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
+                      <Link 
+                        to={`/orders/${order.id}`}
+                        className="flex items-center space-x-2 cursor-pointer hover:text-shopee-orange transition-colors"
+                      >
                         <Package className="w-4 h-4 text-gray-400" />
                         <span className="font-medium text-gray-900">
-                          Đơn hàng #{order.id}
+                          Đơn hàng #{order.orderNumber || order.id}
                         </span>
-                      </div>
+                      </Link>
                       <span className="text-sm text-gray-500">
                         {formatDateTime(order.date)}
                       </span>
@@ -320,15 +341,25 @@ const CustomerOrders = () => {
                   {/* Items */}
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-start space-x-4">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
+                      <Link 
+                        to={`/orders/${order.id}`}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      </Link>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 mb-1">
-                          {item.name}
-                        </h4>
+                        <Link 
+                          to={`/orders/${order.id}`}
+                          className="cursor-pointer hover:text-shopee-orange transition-colors"
+                        >
+                          <h4 className="font-medium text-gray-900 mb-1">
+                            {item.name}
+                          </h4>
+                        </Link>
                         <p className="text-sm text-gray-500 mb-2">
                           {item.variant}
                         </p>
@@ -337,7 +368,7 @@ const CustomerOrders = () => {
                             x{item.quantity}
                           </span>
                           <span className="font-semibold text-shopee-orange">
-                            {formatCurrency(item.price)}
+                            {formatCurrency(item.totalPrice || (item.unitPrice * item.quantity))}
                           </span>
                         </div>
                       </div>
@@ -370,7 +401,8 @@ const CustomerOrders = () => {
                         <span className="font-medium text-sm">Đã hủy</span>
                       </div>
                       <div className="text-sm">
-                        Lý do: {order.cancelReason}
+                        <span className="font-medium">Lý do:</span>{' '}
+                        {order.cancellationReason || 'Không có lý do'}
                       </div>
                     </div>
                   )}
@@ -394,12 +426,16 @@ const CustomerOrders = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleCancelOrder(order.id)}
+                          onClick={() => handleCancelOrderClick(order.id, order.orderNumber)}
                         >
                           Hủy đơn
                         </Button>
-                        <Button variant="primary" size="sm">
-                          Thanh toán ngay
+                        <Button 
+                          variant="primary" 
+                          size="sm"
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                        >
+                          Xem chi tiết
                         </Button>
                       </>
                     )}
@@ -409,7 +445,11 @@ const CustomerOrders = () => {
                         <Button variant="outline" size="sm">
                           Liên hệ người bán
                         </Button>
-                        <Button variant="primary" size="sm">
+                        <Button 
+                          variant="primary" 
+                          size="sm"
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                        >
                           Theo dõi đơn hàng
                         </Button>
                       </>
@@ -434,10 +474,19 @@ const CustomerOrders = () => {
                     )}
                     
                     {order.status === 'cancelled' && (
-                      <Button variant="outline" size="sm" className="flex items-center gap-2">
-                        <RotateCcw className="w-4 h-4" />
-                        Mua lại
-                      </Button>
+                      <>
+                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                          <RotateCcw className="w-4 h-4" />
+                          Mua lại
+                        </Button>
+                        <Button 
+                          variant="primary" 
+                          size="sm"
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                        >
+                          Xem chi tiết
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -446,6 +495,18 @@ const CustomerOrders = () => {
           })
         )}
       </div>
+
+      {/* Cancel Order Modal */}
+      <CancelOrderModal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setSelectedOrderId(null);
+          setSelectedOrderNumber(null);
+        }}
+        onConfirm={handleCancelConfirm}
+        orderNumber={selectedOrderNumber}
+      />
     </div>
   );
 };

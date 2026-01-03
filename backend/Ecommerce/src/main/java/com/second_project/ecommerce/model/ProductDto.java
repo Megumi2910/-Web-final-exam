@@ -44,7 +44,7 @@ public class ProductDto {
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
     private BigDecimal price;
 
-    @DecimalMin(value = "0.0", message = "Giá gốc phải lớn hơn hoặc bằng 0")
+    @DecimalMin(value = "0.0", message = "Giá nhập hàng phải lớn hơn hoặc bằng 0")
     private BigDecimal originalPrice;
 
     @NotNull(message = "Số lượng tồn kho là bắt buộc")

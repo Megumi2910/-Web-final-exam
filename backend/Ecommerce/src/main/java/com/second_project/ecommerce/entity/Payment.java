@@ -37,12 +37,12 @@ public class Payment {
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @NotNull
     private PaymentMethod paymentMethod;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @NotNull
     private PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
@@ -57,6 +57,9 @@ public class Payment {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(nullable = true) // Nullable because payment might be pending or failed
+    private LocalDateTime paidAt;
 
     public Payment() {}
 
@@ -144,19 +147,41 @@ public class Payment {
         this.updatedAt = updatedAt;
     }
 
+    public LocalDateTime getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
+    }
+
     public enum PaymentMethod {
-        CASH_ON_DELIVERY,
-        CREDIT_CARD,
-        DEBIT_CARD,
-        BANK_TRANSFER,
-        E_WALLET
+        COD,  // Cash on Delivery
+        QR    // QR Code Payment
     }
 
     public enum PaymentStatus {
         PENDING,
         PAID,
-        FAILED,
-        REFUNDED
+        FAILED
+    }
+    
+    // Alias for transactionId (for backward compatibility with book_store pattern)
+    public String getTransactionCode() {
+        return transactionId;
+    }
+    
+    public void setTransactionCode(String transactionCode) {
+        this.transactionId = transactionCode;
+    }
+    
+    // Alias for id (for backward compatibility with book_store pattern)
+    public Long getPaymentId() {
+        return id;
+    }
+    
+    public void setPaymentId(Long paymentId) {
+        this.id = paymentId;
     }
 }
 

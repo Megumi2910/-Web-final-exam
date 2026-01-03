@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,9 +83,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product save(Product product) {
-        if (product.getProductId() == null) {
+        if (product.getId() == null) {
             product.setCreatedAt(LocalDateTime.now());
-            product.setStatus(Product.ProductStatus.PENDING);
+            // Only set status to PENDING for new products if status is not already set
+            if (product.getStatus() == null) {
+                product.setStatus(Product.ProductStatus.PENDING);
+            }
         }
         product.setUpdatedAt(LocalDateTime.now());
         return productRepository.save(product);
@@ -233,11 +237,53 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ProductDto> findFeaturedProductsDtos(int limit) {
+        List<Product> products = productRepository.findByIsFeaturedTrueAndStatusOrderByCreatedAtDesc(Product.ProductStatus.APPROVED);
+        return products.stream()
+                .limit(limit)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ProductDto> findNewProductsDtos() {
         List<Product> products = productRepository.findByIsNewTrueAndStatusOrderByCreatedAtDesc(Product.ProductStatus.APPROVED);
         return products.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDto> findNewProductsDtos(int limit) {
+        List<Product> products = productRepository.findByIsNewTrueAndStatusOrderByCreatedAtDesc(Product.ProductStatus.APPROVED);
+        return products.stream()
+                .limit(limit)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDto> findHotProductsDtos(int limit) {
+        List<Product> products = productRepository.findByIsHotTrueAndStatus(Product.ProductStatus.APPROVED, PageRequest.of(0, limit))
+                .stream()
+                .sorted((p1, p2) -> Integer.compare(p2.getSoldCount(), p1.getSoldCount()))
+                .collect(Collectors.toList());
+        return products.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductDto> findByCategoryIdDtos(Long categoryId, Pageable pageable) {
+        Page<Product> productPage = productRepository.findByCategoryIdAndStatus(categoryId, Product.ProductStatus.APPROVED, pageable);
+        List<ProductDto> dtos = productPage.getContent().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+        return new PageImpl<>(dtos, pageable, productPage.getTotalElements());
     }
 
     @Override
@@ -282,6 +328,14 @@ public class ProductServiceImpl implements ProductService {
         product.setIsFeatured(productDto.getIsFeatured());
         product.setIsHot(productDto.getIsHot());
         product.setIsNew(productDto.getIsNew());
+        
+        // Preserve status - only update if explicitly provided and user has permission
+        // Admin can change status, but we preserve it if not provided to prevent accidental reverts
+        if (productDto.getStatus() != null) {
+            product.setStatus(productDto.getStatus());
+        }
+        // If status is not provided in DTO, keep the existing status (important for approval persistence)
+        
         product.setUpdatedAt(LocalDateTime.now());
 
         // Update categories if provided

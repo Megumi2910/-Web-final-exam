@@ -85,6 +85,9 @@ public class Order {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -299,6 +302,14 @@ public class Order {
     
     public String getShippingPhone() {
         return phoneNumber;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
     }
 
     public enum OrderStatus {

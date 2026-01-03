@@ -68,15 +68,43 @@ public class ProductRestController {
     }
 
     @GetMapping("/featured")
-    public ResponseEntity<ApiResponse<List<ProductDto>>> getFeaturedProducts() {
-        List<ProductDto> products = productService.findFeaturedProductsDtos();
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getFeaturedProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDto> products = productService.findFeaturedProductsDtos(limit);
         return ResponseEntity.ok(ApiResponse.success("Featured products retrieved successfully", products));
     }
 
     @GetMapping("/new")
-    public ResponseEntity<ApiResponse<List<ProductDto>>> getNewProducts() {
-        List<ProductDto> products = productService.findNewProductsDtos();
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getNewProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDto> products = productService.findNewProductsDtos(limit);
         return ResponseEntity.ok(ApiResponse.success("New products retrieved successfully", products));
+    }
+
+    @GetMapping("/hot")
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getHotProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDto> products = productService.findHotProductsDtos(limit);
+        return ResponseEntity.ok(ApiResponse.success("Hot products retrieved successfully", products));
+    }
+
+    @GetMapping("/category/{categoryId}")
+    public ResponseEntity<PageResponse<ProductDto>> getProductsByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ProductDto> productPage = productService.findByCategoryIdDtos(categoryId, pageable);
+        
+        return ResponseEntity.ok(PageResponse.success(
+                "Products by category retrieved successfully",
+                productPage.getContent(),
+                productPage.getNumber(),
+                productPage.getSize(),
+                productPage.getTotalElements(),
+                productPage.getTotalPages()
+        ));
     }
 
     @GetMapping("/{id}")

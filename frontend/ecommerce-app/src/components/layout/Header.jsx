@@ -66,7 +66,17 @@ const Header = () => {
       fetchCartCount();
       // Refresh cart count every 30 seconds
       const interval = setInterval(fetchCartCount, 30000);
-      return () => clearInterval(interval);
+      
+      // Listen for cart update events to refresh immediately
+      const handleCartUpdate = () => {
+        fetchCartCount();
+      };
+      window.addEventListener('cartUpdated', handleCartUpdate);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('cartUpdated', handleCartUpdate);
+      };
     } else {
       setCartItemCount(0);
     }
@@ -152,7 +162,7 @@ const Header = () => {
             <div className="hidden md:flex items-center space-x-6">
               <button className="hover:text-gray-200 transition-colors">Tải ứng dụng</button>
               <button className="hover:text-gray-200 transition-colors">Kết nối</button>
-              <button className="hover:text-gray-200 transition-colors">Theo dõi đơn hàng</button>
+              <Link to="/orders" className="hover:text-gray-200 transition-colors">Theo dõi đơn hàng</Link>
             </div>
           </div>
         </div>
@@ -411,6 +421,10 @@ const Header = () => {
                     <Link to="/customer/profile" className="flex items-center space-x-2 py-2 text-white bg-orange-600 hover:bg-orange-700 px-3 rounded-lg w-full text-left font-medium">
                       <User className="w-4 h-4" />
                       <span>Tài khoản của tôi</span>
+                    </Link>
+                    <Link to="/orders" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left">
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>Đơn hàng của tôi</span>
                     </Link>
                     <Link to="/customer/settings" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left">
                       <Settings className="w-4 h-4" />

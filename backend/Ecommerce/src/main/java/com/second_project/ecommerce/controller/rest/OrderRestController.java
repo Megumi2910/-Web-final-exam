@@ -3,10 +3,13 @@ package com.second_project.ecommerce.controller.rest;
 import com.second_project.ecommerce.entity.Order;
 import com.second_project.ecommerce.entity.User;
 import com.second_project.ecommerce.model.ApiResponse;
+import com.second_project.ecommerce.model.CheckoutRequestDto;
+import com.second_project.ecommerce.model.OrderDto;
 import com.second_project.ecommerce.model.PageResponse;
 import com.second_project.ecommerce.security.CustomUserDetails;
 import com.second_project.ecommerce.service.OrderService;
 import com.second_project.ecommerce.service.UserService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,8 +42,20 @@ public class OrderRestController {
         return ResponseEntity.ok(ApiResponse.success("Order created successfully", order));
     }
 
+    @PostMapping("/checkout")
+    public ResponseEntity<ApiResponse<OrderDto>> checkout(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody CheckoutRequestDto checkoutRequest) {
+
+        User user = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        OrderDto orderDto = orderService.createOrderFromCartDto(user, checkoutRequest);
+        return ResponseEntity.ok(ApiResponse.success("Order created successfully", orderDto));
+    }
+
     @GetMapping
-    public ResponseEntity<PageResponse<Order>> getUserOrders(
+    public ResponseEntity<PageResponse<OrderDto>> getUserOrders(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -49,7 +64,7 @@ public class OrderRestController {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Order> orderPage = orderService.findByUser(user, pageable);
+        Page<OrderDto> orderPage = orderService.findByUserDto(user, pageable);
 
         return ResponseEntity.ok(PageResponse.success(
                 "Orders retrieved successfully",
@@ -62,34 +77,36 @@ public class OrderRestController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Order>> getOrderById(
+    public ResponseEntity<ApiResponse<OrderDto>> getOrderById(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id) {
 
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Order order = orderService.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        OrderDto orderDto = orderService.getOrderDtoById(id);
 
         // Verify order belongs to user (or user is admin)
-        if (!order.getUser().getUserId().equals(user.getUserId()) && 
+        if (!orderDto.getUserId().equals(user.getUserId()) && 
             user.getRole() != User.UserRole.ADMIN) {
             throw new IllegalArgumentException("Access denied");
         }
 
-        return ResponseEntity.ok(ApiResponse.success("Order retrieved successfully", order));
+        return ResponseEntity.ok(ApiResponse.success("Order retrieved successfully", orderDto));
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @RequestBody(required = false) CancelOrderRequest request) {
 
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        orderService.cancelOrder(id, user);
+        String cancellationReason = request != null ? request.getCancellationReason() : null;
+        log.info("Received cancel order request for order {} with reason: {}", id, cancellationReason);
+        orderService.cancelOrder(id, user, cancellationReason);
         return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully", null));
     }
 
@@ -137,6 +154,11 @@ public class OrderRestController {
     public static class CreateOrderRequest {
         private String shippingAddress;
         private String shippingPhone;
+    }
+
+    @Data
+    public static class CancelOrderRequest {
+        private String cancellationReason;
     }
 }
 

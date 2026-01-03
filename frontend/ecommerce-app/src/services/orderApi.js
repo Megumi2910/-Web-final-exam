@@ -21,9 +21,16 @@ export const orderApi = {
     return api.post('/orders', data);
   },
 
+  // Checkout (create order from cart)
+  checkout: (data) => {
+    return api.post('/orders/checkout', data);
+  },
+
   // Cancel order
-  cancelOrder: (id) => {
-    return api.put(`/orders/${id}/cancel`);
+  cancelOrder: (id, cancellationReason = null) => {
+    return api.put(`/orders/${id}/cancel`, {
+      cancellationReason: cancellationReason
+    });
   },
 
   // Get order statistics

@@ -7,13 +7,24 @@ export const cartApi = {
   },
 
   // Add item to cart
-  addToCart: (data) => {
-    return api.post('/cart/items', data);
+  addToCart: (productId, quantity = 1) => {
+    return api.post('/cart/items', null, {
+      params: { productId, quantity }
+    });
+  },
+
+  // Buy now - add to cart and redirect to checkout
+  buyNow: (productId, quantity = 1) => {
+    return api.post('/cart/buy-now', null, {
+      params: { productId, quantity }
+    });
   },
 
   // Update cart item
-  updateCartItem: (cartItemId, data) => {
-    return api.put(`/cart/items/${cartItemId}`, data);
+  updateCartItem: (cartItemId, quantity) => {
+    return api.put(`/cart/items/${cartItemId}`, null, {
+      params: { quantity }
+    });
   },
 
   // Remove item from cart

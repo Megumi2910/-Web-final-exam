@@ -59,6 +59,9 @@ public class UserRestController {
         if (request.getLastName() != null) {
             user.setLastName(request.getLastName());
         }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
 
         User updatedUser = userService.save(user);
         log.info("User profile updated for user {}", user.getUserId());
@@ -127,6 +130,7 @@ public class UserRestController {
     public static class UpdateProfileRequest {
         private String firstName;
         private String lastName;
+        private String address;
     }
 
     @Data

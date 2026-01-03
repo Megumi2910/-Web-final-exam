@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { 
-  Heart, 
   Star, 
   ShoppingCart, 
   Truck, 
   Shield, 
   RotateCcw, 
   Minus,
-  Plus,
-  Share2
+  Plus
 } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import { clsx } from 'clsx';
@@ -16,6 +14,7 @@ import { clsx } from 'clsx';
 const ProductInfo = ({ 
   product, 
   onAddToCart,
+  onBuyNow,
   onToggleWishlist,
   isWishlisted = false,
   className = '' 
@@ -34,13 +33,6 @@ const ProductInfo = ({
     variants = []
   } = product;
 
-  const handleAddToCart = () => {
-    onAddToCart?.({
-      ...product,
-      quantity,
-      selectedVariant
-    });
-  };
 
   const handleToggleWishlist = () => {
     onToggleWishlist?.(product);
@@ -137,14 +129,24 @@ const ProductInfo = ({
         <div className="flex items-center space-x-3">
           <div className="flex items-center border border-gray-300 rounded-lg">
             <button
-              onClick={() => handleQuantityChange(quantity - 1)}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleQuantityChange(quantity - 1);
+              }}
               className="p-2 hover:bg-gray-100 transition-colors"
             >
               <Minus className="w-4 h-4" />
             </button>
             <span className="px-4 py-2 min-w-[60px] text-center">{quantity}</span>
             <button
-              onClick={() => handleQuantityChange(quantity + 1)}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleQuantityChange(quantity + 1);
+              }}
               className="p-2 hover:bg-gray-100 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -157,27 +159,39 @@ const ProductInfo = ({
       </div>
 
       {/* Action buttons */}
-      <div className="flex space-x-4">
+      <div className="flex flex-col space-y-3" onClick={(e) => e.stopPropagation()}>
         <Button
-          onClick={handleAddToCart}
-          className="flex-1 shopee-gradient"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Capture current quantity value to prevent any state changes
+            const currentQuantity = quantity;
+            onBuyNow?.({ ...product, quantity: currentQuantity, selectedVariant });
+          }}
+          className="w-full shopee-gradient"
           size="lg"
+          type="button"
+        >
+          Mua ngay
+        </Button>
+        <Button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Capture current quantity value to prevent any state changes
+            const currentQuantity = quantity;
+            onAddToCart?.({
+              ...product,
+              quantity: currentQuantity,
+              selectedVariant
+            });
+          }}
+          className="w-full shopee-gradient"
+          size="lg"
+          type="button"
         >
           <ShoppingCart className="w-5 h-5 mr-2" />
           Thêm vào giỏ hàng
-        </Button>
-        <Button
-          onClick={handleToggleWishlist}
-          variant={isWishlisted ? "primary" : "outline"}
-          size="lg"
-        >
-          <Heart className={clsx('w-5 h-5', isWishlisted && 'fill-current')} />
-        </Button>
-        <Button
-          variant="outline"
-          size="lg"
-        >
-          <Share2 className="w-5 h-5" />
         </Button>
       </div>
 

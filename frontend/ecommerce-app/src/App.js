@@ -11,6 +11,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import CategoriesPage from './pages/CategoriesPage';
+import CategoryProductsPage from './pages/CategoryProductsPage';
 import FlashSalePage from './pages/FlashSalePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -41,6 +42,7 @@ import {
   ShoppingCart,
   CheckoutPage
 } from './pages/customer';
+import OrderDetailPage from './pages/customer/OrderDetailPage';
 import './index.css';
 
 function App() {
@@ -51,6 +53,7 @@ function App() {
         {/* Public routes with main layout */}
         <Route path="/" element={<Layout><HomePage /></Layout>} />
         <Route path="/product/:id" element={<Layout><ProductDetailPage /></Layout>} />
+        <Route path="/category/:id" element={<Layout><CategoryProductsPage /></Layout>} />
         <Route path="/categories" element={<Layout><CategoriesPage /></Layout>} />
         <Route path="/flash-sale" element={<Layout><FlashSalePage /></Layout>} />
         <Route path="/about" element={<Layout><AboutPage /></Layout>} />
@@ -121,6 +124,16 @@ function App() {
         <Route path="/checkout" element={
           <ProtectedRoute allowedRoles={['CUSTOMER', 'SELLER', 'ADMIN']}>
             <CheckoutPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/orders" element={
+          <ProtectedRoute allowedRoles={['CUSTOMER', 'SELLER', 'ADMIN']}>
+            <Layout><CustomerOrders /></Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/orders/:id" element={
+          <ProtectedRoute allowedRoles={['CUSTOMER', 'SELLER', 'ADMIN']}>
+            <Layout><OrderDetailPage /></Layout>
           </ProtectedRoute>
         } />
       </Routes>
