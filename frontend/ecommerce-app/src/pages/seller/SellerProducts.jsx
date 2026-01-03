@@ -14,6 +14,7 @@ import {
   Image
 } from 'lucide-react';
 import { categoryApi } from '../../services/categoryApi';
+import { sellerApi } from '../../services/sellerApi';
 
 const ProductCard = ({ product, onEdit, onDelete, onView }) => {
   return (
@@ -127,15 +128,31 @@ const SellerProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      // TODO: Implement seller products API call
-      // const response = await sellerApi.getMyProducts();
-      // if (response.data.success) {
-      //   setProducts(response.data.data);
-      // }
-      setProducts([]); // Empty until API is implemented
+      const response = await sellerApi.getMyProducts(0, 100);
+      if (response.data.success) {
+        const productList = response.data.data.content || response.data.data || [];
+        // Map API response to component format
+        const mappedProducts = productList.map(product => ({
+          id: product.id?.toString() || product.productId?.toString() || '',
+          name: product.name || '',
+          price: product.price ? parseFloat(product.price) : 0,
+          stock: product.stock || 0,
+          category: product.categories?.[0]?.name || 'Chưa phân loại',
+          description: product.description || '',
+          images: product.images || [],
+          image: product.images?.[0] || product.imageUrl || '',
+          status: product.status === 'APPROVED' ? 'active' : 'inactive',
+          rating: product.rating || 0,
+          sold: product.soldCount || 0
+        }));
+        setProducts(mappedProducts);
+      } else {
+        setProducts([]);
+      }
     } catch (error) {
       console.error('Error fetching products:', error);
       setError('Không thể tải danh sách sản phẩm. Vui lòng thử lại.');
+      setProducts([]);
     } finally {
       setLoading(false);
     }

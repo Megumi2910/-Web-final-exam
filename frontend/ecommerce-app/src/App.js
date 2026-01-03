@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -43,6 +43,7 @@ import {
   CheckoutPage
 } from './pages/customer';
 import OrderDetailPage from './pages/customer/OrderDetailPage';
+import ShopPage from './pages/ShopPage';
 import './index.css';
 
 function App() {
@@ -81,9 +82,9 @@ function App() {
           <Route path="settings" element={<AdminSettings />} />
         </Route>
         
-        {/* Seller routes with seller layout - Protected for SELLER role only */}
+        {/* Seller routes with seller layout - Protected for SELLER and ADMIN roles */}
         <Route path="/seller" element={
-          <ProtectedRoute allowedRoles={['SELLER']}>
+          <ProtectedRoute allowedRoles={['SELLER', 'ADMIN']}>
             <SellerLayout />
           </ProtectedRoute>
         }>
@@ -101,16 +102,18 @@ function App() {
             <CustomerLayout />
           </ProtectedRoute>
         }>
+          <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<CustomerDashboard />} />
           <Route path="orders" element={<CustomerOrders />} />
           <Route path="wishlist" element={<CustomerWishlist />} />
           <Route path="wallet" element={<CustomerDashboard />} />
+          <Route path="profile" element={<CustomerProfile />} />
           <Route path="settings" element={<CustomerSettings />} />
         </Route>
         
-        {/* Customer profile - accessible to CUSTOMER, ADMIN, and SELLER */}
+        {/* Customer profile - also accessible to ADMIN and SELLER (for viewing their own profile) */}
         <Route path="/customer/profile" element={
-          <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN', 'SELLER']}>
+          <ProtectedRoute allowedRoles={['ADMIN', 'SELLER']}>
             <Layout><CustomerProfile /></Layout>
           </ProtectedRoute>
         } />
@@ -135,6 +138,9 @@ function App() {
           <ProtectedRoute allowedRoles={['CUSTOMER', 'SELLER', 'ADMIN']}>
             <Layout><OrderDetailPage /></Layout>
           </ProtectedRoute>
+        } />
+        <Route path="/shop/:sellerId" element={
+          <Layout><ShopPage /></Layout>
         } />
       </Routes>
     </Router>

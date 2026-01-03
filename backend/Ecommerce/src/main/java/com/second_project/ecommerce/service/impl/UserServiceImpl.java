@@ -365,6 +365,7 @@ public class UserServiceImpl implements UserService {
                 .isVerified(user.getIsVerified())
                 .isSellerApproved(user.getIsSellerApproved())
                 .storeName(user.getStoreName())
+                .storeAddress(user.getStoreAddress())
                 .build();
     }
 }

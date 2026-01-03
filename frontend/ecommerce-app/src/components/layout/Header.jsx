@@ -338,7 +338,7 @@ const Header = () => {
                         <span className="text-sm">Tài khoản của tôi</span>
                       </Link>
                       <Link
-                        to="/customer/settings"
+                        to={hasRole('ADMIN') ? "/admin/settings" : "/customer/settings"}
                         className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
@@ -347,7 +347,7 @@ const Header = () => {
                       </Link>
                       {hasRole('ADMIN') && (
                         <Link
-                          to="/admin"
+                          to="/admin/settings"
                           className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >
@@ -355,14 +355,14 @@ const Header = () => {
                           <span className="text-sm">Admin</span>
                         </Link>
                       )}
-                      {hasRole('SELLER') && (
+                      {(hasRole('SELLER') || hasRole('ADMIN')) && (
                         <Link
                           to="/seller"
                           className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >
                           <Store className="w-4 h-4" />
-                          <span className="text-sm">Seller</span>
+                          <span className="text-sm">Cửa hàng</span>
                         </Link>
                       )}
                       <div className="border-t border-gray-200 my-2"></div>
@@ -440,10 +440,10 @@ const Header = () => {
                         <span>Admin</span>
                       </Link>
                     )}
-                    {hasRole('SELLER') && (
+                    {(hasRole('SELLER') || hasRole('ADMIN')) && (
                       <Link to="/seller" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-blue-600 w-full text-left">
                         <Store className="w-4 h-4" />
-                        <span>Seller</span>
+                        <span>Cửa hàng</span>
                       </Link>
                     )}
                     <button

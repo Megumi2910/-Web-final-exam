@@ -26,6 +26,8 @@ public interface OrderService {
     com.second_project.ecommerce.model.OrderDto getOrderDtoById(Long id);
     Page<com.second_project.ecommerce.model.OrderDto> findByUserDto(User user, Pageable pageable);
     
+    DashboardStatistics getDashboardStatistics(User user);
+    
     @lombok.Data
     class OrderStatistics {
         private Long totalCount;
@@ -33,6 +35,15 @@ public interface OrderService {
         private Long shippingCount;
         private Long completedCount;
         private Long cancelledCount;
+    }
+    
+    @lombok.Data
+    class DashboardStatistics {
+        private java.math.BigDecimal totalSpending;
+        private Long completedOrders;
+        private Long cancelledOrders;
+        private Double successRate;
+        private java.util.List<String> addresses;
     }
 }
 

@@ -58,5 +58,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     
     @Query("SELECT DISTINCT o FROM Order o JOIN o.items oi WHERE oi.product.seller.userId = :sellerId ORDER BY o.orderDate DESC")
     Page<Order> findRecentOrdersBySellerId(@Param("sellerId") Long sellerId, Pageable pageable);
+    
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.user.userId = :userId AND o.orderStatus = 'COMPLETED'")
+    java.math.BigDecimal calculateTotalSpendingByUserId(@Param("userId") Long userId);
+    
+    @Query("SELECT DISTINCT o.shippingAddress FROM Order o WHERE o.user.userId = :userId ORDER BY o.orderDate DESC")
+    List<String> findDistinctShippingAddressesByUserId(@Param("userId") Long userId, Pageable pageable);
 }
 

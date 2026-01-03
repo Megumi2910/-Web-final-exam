@@ -125,6 +125,8 @@ const ShoppingCart = () => {
         setSelectedItems(prev => prev.filter(key => key !== itemKey));
         // Refresh cart
         await fetchCart();
+        // Trigger cart count refresh in header immediately
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
       }
     } catch (error) {
       console.error('Error removing cart item:', error);

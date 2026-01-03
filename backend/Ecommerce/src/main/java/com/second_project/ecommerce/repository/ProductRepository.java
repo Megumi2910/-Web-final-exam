@@ -29,6 +29,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     Page<Product> findByStatusAndSellerId(ProductStatus status, Long sellerId, Pageable pageable);
     
+    @Query("SELECT p FROM Product p WHERE p.seller.userId = :sellerId AND p.status = :status")
+    Page<Product> findBySellerIdAndStatus(@Param("sellerId") Long sellerId, 
+                                          @Param("status") ProductStatus status, 
+                                          Pageable pageable);
+    
     Page<Product> findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(
         String name, String brand, Pageable pageable);
     

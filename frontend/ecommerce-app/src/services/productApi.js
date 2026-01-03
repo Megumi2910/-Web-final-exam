@@ -41,7 +41,7 @@ export const productApi = {
     return api.get(`/products/hot?limit=${limit}`);
   },
 
-  // Get seller's products
+  // Get seller's products (public endpoint)
   getSellerProducts: (sellerId, page = 0, size = 20) => {
     return api.get(`/products/seller/${sellerId}?page=${page}&size=${size}`);
   },

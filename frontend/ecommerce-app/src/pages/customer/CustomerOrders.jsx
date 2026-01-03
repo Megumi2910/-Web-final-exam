@@ -220,12 +220,13 @@ const CustomerOrders = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Đơn hàng của tôi</h1>
-        <p className="text-gray-600">Quản lý và theo dõi đơn hàng của bạn</p>
-      </div>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Đơn hàng của tôi</h1>
+          <p className="text-gray-600">Quản lý và theo dõi đơn hàng của bạn</p>
+        </div>
 
       {/* Search and Filter */}
       <Card>
@@ -496,17 +497,18 @@ const CustomerOrders = () => {
         )}
       </div>
 
-      {/* Cancel Order Modal */}
-      <CancelOrderModal
-        isOpen={cancelModalOpen}
-        onClose={() => {
-          setCancelModalOpen(false);
-          setSelectedOrderId(null);
-          setSelectedOrderNumber(null);
-        }}
-        onConfirm={handleCancelConfirm}
-        orderNumber={selectedOrderNumber}
-      />
+        {/* Cancel Order Modal */}
+        <CancelOrderModal
+          isOpen={cancelModalOpen}
+          onClose={() => {
+            setCancelModalOpen(false);
+            setSelectedOrderId(null);
+            setSelectedOrderNumber(null);
+          }}
+          onConfirm={handleCancelConfirm}
+          orderNumber={selectedOrderNumber}
+        />
+      </div>
     </div>
   );
 };

@@ -2,24 +2,16 @@ import React, { useState } from 'react';
 import { 
   Settings as SettingsIcon,
   Save,
-  Upload,
   Bell,
-  Shield,
-  Globe,
   Mail,
-  CreditCard,
-  Database,
+  Shield,
   Palette,
-  Monitor,
-  Smartphone,
-  Lock,
-  Eye,
-  EyeOff,
-  Key,
-  CheckCircle,
-  AlertCircle
+  Database,
+  Globe,
+  User,
+  Store
 } from 'lucide-react';
-import { userApi } from '../../services/userApi';
+import ProfileSettings from '../../components/settings/ProfileSettings';
 
 const SettingSection = ({ title, icon: Icon, children }) => {
   return (
@@ -34,12 +26,16 @@ const SettingSection = ({ title, icon: Icon, children }) => {
 };
 
 const AdminSettings = () => {
+  const [activeTab, setActiveTab] = useState('system');
   const [settings, setSettings] = useState({
     siteName: 'CNVLTW',
     siteDescription: 'Cửa hàng thương mại điện tử hàng đầu',
-    email: 'admin@cnvltw.com',
+    contactEmail: 'admin@cnvltw.com',
     phone: '1900 1234',
     address: '123 Đường ABC, Quận 1, TP.HCM',
+    supportEmail: 'support@cnvltw.com',
+    salesEmail: 'sales@cnvltw.com',
+    marketingEmail: 'marketing@cnvltw.com',
     currency: 'VND',
     timezone: 'Asia/Ho_Chi_Minh',
     notifications: {
@@ -59,99 +55,40 @@ const AdminSettings = () => {
     }
   });
 
-  // Password change state
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false
-  });
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
-
   const handleSave = () => {
-    console.log('Saving settings:', settings);
+    console.log('Saving system settings:', settings);
     // Here you would typically save to backend
-    alert('Cài đặt đã được lưu thành công!');
+    alert('Cài đặt hệ thống đã được lưu thành công!');
   };
 
   const handleInputChange = (section, field, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
+    if (section) {
+      setSettings(prev => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value
+        }
+      }));
+    } else {
+      setSettings(prev => ({
+        ...prev,
         [field]: value
-      }
-    }));
-  };
-
-  const handlePasswordChange = async (e) => {
-    e.preventDefault();
-    setPasswordMessage({ type: '', text: '' });
-
-    // Frontend validation
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      setPasswordMessage({ type: 'error', text: 'Vui lòng điền đầy đủ thông tin' });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 8) {
-      setPasswordMessage({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordMessage({ type: 'error', text: 'Mật khẩu phải khớp nhau' });
-      return;
-    }
-
-    setPasswordLoading(true);
-    try {
-      await userApi.changePassword({
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
-      });
-      setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công!' });
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-    } catch (error) {
-      console.error('Error changing password:', error);
-      const errorMessage = error.response?.data?.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
-      
-      // Translate backend error messages to Vietnamese
-      let translatedMessage = errorMessage;
-      if (errorMessage.toLowerCase().includes('current password is incorrect') || 
-          (errorMessage.toLowerCase().includes('current password') && 
-           errorMessage.toLowerCase().includes('incorrect'))) {
-        translatedMessage = 'Mật khẩu hiện tại không đúng';
-      } else if (errorMessage.toLowerCase().includes('new password must be different') || 
-                 (errorMessage.toLowerCase().includes('must be different') && 
-                  errorMessage.toLowerCase().includes('current password'))) {
-        translatedMessage = 'Mật khẩu mới phải khác mật khẩu hiện tại';
-      }
-      
-      setPasswordMessage({ 
-        type: 'error', 
-        text: translatedMessage
-      });
-    } finally {
-      setPasswordLoading(false);
+      }));
     }
   };
 
-  return (
+  const tabs = [
+    { id: 'system', label: 'Hệ thống', icon: SettingsIcon },
+    { id: 'profile', label: 'Hồ sơ', icon: User }
+  ];
+
+  const renderSystemTab = () => (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cài đặt hệ thống</h1>
+          <h2 className="text-xl font-bold text-gray-900">Cài đặt hệ thống</h2>
           <p className="text-gray-600">Quản lý cài đặt và cấu hình hệ thống</p>
         </div>
         <button
@@ -171,7 +108,7 @@ const AdminSettings = () => {
             <input
               type="text"
               value={settings.siteName}
-              onChange={(e) => setSettings(prev => ({ ...prev, siteName: e.target.value }))}
+              onChange={(e) => handleInputChange(null, 'siteName', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -180,7 +117,7 @@ const AdminSettings = () => {
             <input
               type="text"
               value={settings.siteDescription}
-              onChange={(e) => setSettings(prev => ({ ...prev, siteDescription: e.target.value }))}
+              onChange={(e) => handleInputChange(null, 'siteDescription', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -188,8 +125,8 @@ const AdminSettings = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Email liên hệ</label>
             <input
               type="email"
-              value={settings.email}
-              onChange={(e) => setSettings(prev => ({ ...prev, email: e.target.value }))}
+              value={settings.contactEmail}
+              onChange={(e) => handleInputChange(null, 'contactEmail', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -198,18 +135,32 @@ const AdminSettings = () => {
             <input
               type="tel"
               value={settings.phone}
-              onChange={(e) => setSettings(prev => ({ ...prev, phone: e.target.value }))}
+              onChange={(e) => handleInputChange(null, 'phone', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ</label>
-            <textarea
-              value={settings.address}
-              onChange={(e) => setSettings(prev => ({ ...prev, address: e.target.value }))}
-              rows={2}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tiền tệ</label>
+            <select
+              value={settings.currency}
+              onChange={(e) => handleInputChange(null, 'currency', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
+            >
+              <option value="VND">VND (₫)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Múi giờ</label>
+            <select
+              value={settings.timezone}
+              onChange={(e) => handleInputChange(null, 'timezone', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7)</option>
+              <option value="UTC">UTC (GMT+0)</option>
+            </select>
           </div>
         </div>
       </SettingSection>
@@ -221,15 +172,8 @@ const AdminSettings = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Email hỗ trợ</label>
             <input
               type="email"
-              value="support@cnvltw.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Hotline</label>
-            <input
-              type="tel"
-              value="1900 1234"
+              value={settings.supportEmail}
+              onChange={(e) => handleInputChange(null, 'supportEmail', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -237,7 +181,8 @@ const AdminSettings = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Email bán hàng</label>
             <input
               type="email"
-              value="sales@cnvltw.com"
+              value={settings.salesEmail}
+              onChange={(e) => handleInputChange(null, 'salesEmail', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -245,7 +190,8 @@ const AdminSettings = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Email marketing</label>
             <input
               type="email"
-              value="marketing@cnvltw.com"
+              value={settings.marketingEmail}
+              onChange={(e) => handleInputChange(null, 'marketingEmail', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -253,7 +199,7 @@ const AdminSettings = () => {
       </SettingSection>
 
       {/* Notifications */}
-      <SettingSection title="Thông báo" icon={Bell}>
+      <SettingSection title="Thông báo hệ thống" icon={Bell}>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -306,141 +252,23 @@ const AdminSettings = () => {
       </SettingSection>
 
       {/* Security Settings */}
-      <SettingSection title="Bảo mật" icon={Shield}>
-        <div className="space-y-6">
-          {/* Change Password Section */}
-          <div className="border-b border-gray-200 pb-6">
-            <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
-              <Lock className="w-5 h-5 mr-2 text-orange-600" />
-              Đổi mật khẩu
-            </h4>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mật khẩu hiện tại
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.current ? 'text' : 'password'}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
-                    placeholder="Nhập mật khẩu hiện tại"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mật khẩu mới
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.new ? 'text' : 'password'}
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
-                    placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
-                    required
-                    minLength={8}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Xác nhận mật khẩu mới
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.confirm ? 'text' : 'password'}
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10"
-                    placeholder="Nhập lại mật khẩu mới"
-                    required
-                    minLength={8}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {passwordMessage.text && (
-                <div className={`flex items-center space-x-2 p-3 rounded-lg ${
-                  passwordMessage.type === 'success' 
-                    ? 'bg-green-50 text-green-800 border border-green-200' 
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
-                  {passwordMessage.type === 'success' ? (
-                    <CheckCircle className="w-5 h-5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5" />
-                  )}
-                  <span className="text-sm">{passwordMessage.text}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={passwordLoading}
-                className="w-full sm:w-auto px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
-              >
-                {passwordLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Đang xử lý...</span>
-                  </>
-                ) : (
-                  <>
-                    <Key className="w-4 h-4" />
-                    <span>Đổi mật khẩu</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Other Security Settings */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">Xác thực 2 yếu tố</p>
-                <p className="text-sm text-gray-500">Bảo mật tài khoản với 2FA</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.security.twoFactor}
-                  onChange={(e) => handleInputChange('security', 'twoFactor', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-              </label>
+      <SettingSection title="Bảo mật hệ thống" icon={Shield}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-900">Xác thực 2 yếu tố</p>
+              <p className="text-sm text-gray-500">Bảo mật tài khoản với 2FA</p>
             </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.security.twoFactor}
+                onChange={(e) => handleInputChange('security', 'twoFactor', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+            </label>
+          </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Thời gian hết phiên (phút)</label>
@@ -467,7 +295,6 @@ const AdminSettings = () => {
               <option value="medium">Trung bình (8 ký tự, số)</option>
               <option value="strong">Mạnh (8+ ký tự, số, ký tự đặc biệt)</option>
             </select>
-          </div>
           </div>
         </div>
       </SettingSection>
@@ -505,10 +332,10 @@ const AdminSettings = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
             <div className="flex items-center space-x-4">
               <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Upload className="w-8 h-8 text-gray-400" />
+                <Globe className="w-8 h-8 text-gray-400" />
               </div>
               <div>
-                <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <button type="button" className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
                   Tải lên logo
                 </button>
                 <p className="text-sm text-gray-500 mt-1">PNG, JPG tối đa 2MB</p>
@@ -557,6 +384,60 @@ const AdminSettings = () => {
           </div>
         </div>
       </SettingSection>
+    </div>
+  );
+
+  // Shop tab removed - admin will access shop settings via /seller route
+
+  const renderProfileTab = () => (
+    <ProfileSettings showAddress={false} />
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Cài đặt</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Quản lý cài đặt hệ thống và cửa hàng
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="flex flex-col lg:flex-row">
+            {/* Sidebar */}
+            <div className="lg:w-64 border-b lg:border-b-0 lg:border-r border-gray-200">
+              <nav className="p-4 space-y-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-orange-600'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 p-6 lg:p-8">
+              {activeTab === 'system' && renderSystemTab()}
+              {activeTab === 'profile' && renderProfileTab()}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -50,6 +50,11 @@ public class OrderRestController {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Unverified users cannot checkout (same as guests)
+        if (!user.getIsVerified()) {
+            throw new IllegalArgumentException("Please verify your email to place orders");
+        }
+
         OrderDto orderDto = orderService.createOrderFromCartDto(user, checkoutRequest);
         return ResponseEntity.ok(ApiResponse.success("Order created successfully", orderDto));
     }
@@ -148,6 +153,17 @@ public class OrderRestController {
 
         OrderService.OrderStatistics stats = orderService.getUserOrderStatistics(user);
         return ResponseEntity.ok(ApiResponse.success("Order statistics retrieved successfully", stats));
+    }
+
+    @GetMapping("/dashboard-statistics")
+    public ResponseEntity<ApiResponse<OrderService.DashboardStatistics>> getDashboardStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User user = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        OrderService.DashboardStatistics stats = orderService.getDashboardStatistics(user);
+        return ResponseEntity.ok(ApiResponse.success("Dashboard statistics retrieved successfully", stats));
     }
 
     @Data

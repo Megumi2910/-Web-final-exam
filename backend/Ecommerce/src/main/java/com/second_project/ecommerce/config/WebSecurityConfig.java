@@ -81,8 +81,8 @@ public class WebSecurityConfig {
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 
-                // Seller endpoints
-                .requestMatchers("/api/seller/**").hasRole("SELLER")
+                // Seller endpoints (accessible by SELLER and ADMIN)
+                .requestMatchers("/api/seller/**").hasAnyRole("SELLER", "ADMIN")
                 
                 // User profile endpoints (authenticated)
                 .requestMatchers("/api/user/**").authenticated()

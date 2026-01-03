@@ -3,6 +3,7 @@ package com.second_project.ecommerce.controller.rest;
 import com.second_project.ecommerce.entity.User;
 import com.second_project.ecommerce.model.ApiResponse;
 import com.second_project.ecommerce.model.auth.UserInfo;
+import com.second_project.ecommerce.repository.UserRepository;
 import com.second_project.ecommerce.security.CustomUserDetails;
 import com.second_project.ecommerce.service.UserService;
 import lombok.Data;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserRestController {
 
     private final UserService userService;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping("/profile")
@@ -40,6 +42,7 @@ public class UserRestController {
                 .isVerified(user.getIsVerified())
                 .isSellerApproved(user.getIsSellerApproved())
                 .storeName(user.getStoreName())
+                .storeAddress(user.getStoreAddress())
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success("User profile retrieved successfully", userInfo));
@@ -61,6 +64,51 @@ public class UserRestController {
         }
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress());
+        }
+
+        // Update phone number if provided
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
+            String newPhoneNumber = request.getPhoneNumber().trim();
+            // Validate Vietnamese phone number format
+            if (!newPhoneNumber.matches("^(0|\\+84)(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-9]|9[0-9])[0-9]{7}$")) {
+                throw new IllegalArgumentException("Phone number must be a valid Vietnamese phone number (e.g., 0912345678 or +84912345678)");
+            }
+            
+            // Only update if phone number is different from current
+            if (!newPhoneNumber.equals(user.getPhoneNumber())) {
+                String oldPhoneNumber = user.getPhoneNumber();
+                // Check if phone number is already taken by another user
+                userRepository.findByPhoneNumber(newPhoneNumber)
+                        .ifPresent(existingUser -> {
+                            if (!existingUser.getUserId().equals(user.getUserId())) {
+                                throw new IllegalArgumentException("Phone number is already registered to another account");
+                            }
+                        });
+                
+                user.setPhoneNumber(newPhoneNumber);
+                log.info("Phone number updated for user {} from {} to {}", user.getUserId(), oldPhoneNumber, newPhoneNumber);
+            }
+        }
+
+        // Allow email update only for unverified users
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            if (user.getIsVerified()) {
+                throw new IllegalArgumentException("Email cannot be changed for verified users");
+            }
+            
+            String newEmail = request.getEmail().trim().toLowerCase();
+            // Check if email is already taken by another user
+            userService.findByEmail(newEmail)
+                    .ifPresent(existingUser -> {
+                        if (!existingUser.getUserId().equals(user.getUserId())) {
+                            throw new IllegalArgumentException("Email is already registered to another account");
+                        }
+                    });
+            
+            user.setEmail(newEmail);
+            // Reset verification status when email is changed
+            user.setIsVerified(false);
+            log.info("Email updated for unverified user {}, verification status reset", user.getUserId());
         }
 
         User updatedUser = userService.save(user);
@@ -126,10 +174,36 @@ public class UserRestController {
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully", null));
     }
 
+    // Public endpoint to get seller/shop information
+    @GetMapping("/{id}/shop")
+    public ResponseEntity<ApiResponse<UserInfo>> getShopInfo(@PathVariable Long id) {
+        User user = userService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        UserInfo userInfo = UserInfo.builder()
+                .userId(user.getUserId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .address(user.getAddress())
+                .role(user.getRole().name())
+                .isVerified(user.getIsVerified())
+                .isSellerApproved(user.getIsSellerApproved())
+                .storeName(user.getStoreName())
+                .storeDescription(user.getStoreDescription())
+                .storeAddress(user.getStoreAddress())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Shop information retrieved successfully", userInfo));
+    }
+
     @Data
     public static class UpdateProfileRequest {
         private String firstName;
         private String lastName;
+        private String phoneNumber;
+        private String email; // Only allowed for unverified users
         private String address;
     }
 

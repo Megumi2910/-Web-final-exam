@@ -20,7 +20,7 @@ import { userApi } from '../../services/userApi';
 import { orderApi } from '../../services/orderApi';
 
 const CustomerProfile = () => {
-  const { user: authUser, refreshUser } = useAuth();
+  const { user: authUser, refreshUser, isVerified } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [activeSection, setActiveSection] = useState('personal');
@@ -48,6 +48,26 @@ const CustomerProfile = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return '';
+    // Remove all non-digit characters except + at the start
+    let cleaned = phone.replace(/[^\d+]/g, '');
+    // If it starts with +84, keep it, otherwise ensure it starts with 0
+    if (cleaned.startsWith('+84')) {
+      // Limit to +84 followed by 9 digits
+      cleaned = '+84' + cleaned.substring(3).replace(/\D/g, '').substring(0, 9);
+    } else {
+      // Remove leading + if not +84, ensure starts with 0
+      cleaned = cleaned.replace(/^\+/, '');
+      if (cleaned && !cleaned.startsWith('0')) {
+        cleaned = '0' + cleaned.replace(/^0+/, '');
+      }
+      // Limit to 10 digits
+      cleaned = cleaned.substring(0, 10);
+    }
+    return cleaned;
+  };
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -55,11 +75,13 @@ const CustomerProfile = () => {
       if (response.data.success) {
         const userData = response.data.data;
         setProfileData(userData);
+        // Format phone number to ensure it's valid
+        const formattedPhone = formatPhoneNumber(userData.phoneNumber || '');
         setFormData({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
           email: userData.email || '',
-          phoneNumber: userData.phoneNumber || '',
+          phoneNumber: formattedPhone,
           address: userData.address || ''
         });
       }
@@ -67,11 +89,12 @@ const CustomerProfile = () => {
       console.error('Failed to fetch profile:', error);
       // Fallback to auth context user data
       if (authUser) {
+        const formattedPhone = formatPhoneNumber(authUser.phoneNumber || '');
         setFormData({
           firstName: authUser.firstName || '',
           lastName: authUser.lastName || '',
           email: authUser.email || '',
-          phoneNumber: authUser.phoneNumber || '',
+          phoneNumber: formattedPhone,
           address: authUser.address || ''
         });
       }
@@ -107,16 +130,67 @@ const CustomerProfile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    // Format phone number as user types (Vietnamese format)
+    if (name === 'phoneNumber') {
+      // Remove all non-digit characters except + at the start
+      let cleaned = value.replace(/[^\d+]/g, '');
+      // If it starts with +84, keep it, otherwise ensure it starts with 0
+      if (cleaned.startsWith('+84')) {
+        // Limit to +84 followed by 9 digits
+        cleaned = '+84' + cleaned.substring(3).replace(/\D/g, '').substring(0, 9);
+      } else {
+        // Remove leading + if not +84, ensure starts with 0
+        cleaned = cleaned.replace(/^\+/, '');
+        if (cleaned && !cleaned.startsWith('0')) {
+          cleaned = '0' + cleaned.replace(/^0+/, '');
+        }
+        // Limit to 10 digits
+        cleaned = cleaned.substring(0, 10);
+      }
+      setFormData(prev => ({ ...prev, [name]: cleaned }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const validatePhoneNumber = (phone) => {
+    // Vietnamese phone number pattern: (0|+84) followed by valid carrier prefix and 7 digits
+    const pattern = /^(0|\+84)(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-9]|9[0-9])[0-9]{7}$/;
+    return pattern.test(phone);
+  };
+
+  const validateEmail = (email) => {
+    const pattern = /\S+@\S+\.\S+/;
+    return pattern.test(email);
   };
 
   const handleSave = async () => {
+    // Validate phone number format
+    if (!formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber)) {
+      alert('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (ví dụ: 0912345678 hoặc +84912345678)');
+      return;
+    }
+
+    // Validate email if user is unverified and email is being changed
+    if (!isVerified() && formData.email && !validateEmail(formData.email)) {
+      alert('Email không hợp lệ. Vui lòng nhập email đúng định dạng.');
+      return;
+    }
+
     try {
-      await userApi.updateProfile({
+      const updateData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber,
         address: formData.address
-      });
+      };
+
+      // Include email only for unverified users
+      if (!isVerified() && formData.email) {
+        updateData.email = formData.email.trim().toLowerCase();
+      }
+
+      await userApi.updateProfile(updateData);
       // Refresh user data in auth context
       await refreshUser();
       setIsEditing(false);
@@ -124,7 +198,10 @@ const CustomerProfile = () => {
       await fetchProfile();
     } catch (error) {
       console.error('Failed to update profile:', error);
-      alert(error.response?.data?.message || 'Không thể cập nhật hồ sơ');
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể cập nhật hồ sơ';
+      alert(errorMessage);
+      // Don't refetch profile on error to keep user's changes visible
+      // setIsEditing will remain true so user can fix and try again
     }
   };
 
@@ -320,7 +397,7 @@ const CustomerProfile = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Email
+                          Email {!isVerified() && <span className="text-red-500">*</span>}
                         </label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -329,18 +406,31 @@ const CustomerProfile = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            disabled={!isEditing}
+                            disabled={!isEditing || isVerified()}
                             className={clsx(
                               'w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange',
-                              isEditing ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50'
+                              (!isEditing || isVerified()) 
+                                ? 'border-gray-200 bg-gray-50' 
+                                : 'border-gray-300 bg-white'
                             )}
+                            placeholder="Nhập email của bạn"
                           />
                         </div>
+                        {!isVerified() && isEditing && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Bạn có thể thay đổi email vì tài khoản chưa được xác thực. Sau khi thay đổi, bạn cần xác thực email mới.
+                          </p>
+                        )}
+                        {isVerified() && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Email không thể thay đổi vì tài khoản đã được xác thực
+                          </p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Số điện thoại
+                          Số điện thoại <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                           <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -349,12 +439,19 @@ const CustomerProfile = () => {
                             name="phoneNumber"
                             value={formData.phoneNumber}
                             onChange={handleChange}
-                            disabled={true}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 bg-gray-50 rounded-lg"
-                            placeholder="Chưa cập nhật"
+                            disabled={!isEditing}
+                            className={clsx(
+                              'w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange',
+                              isEditing ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50'
+                            )}
+                            placeholder="0912345678 hoặc +84912345678"
                           />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Số điện thoại không thể thay đổi tại đây</p>
+                        {isEditing && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Định dạng: 0912345678 hoặc +84912345678
+                          </p>
+                        )}
                       </div>
                     </div>
 

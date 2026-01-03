@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, Image as ImageIcon, Store } from 'lucide-react';
 import { categoryApi } from '../../services/categoryApi';
 
 const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
@@ -14,8 +14,6 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
     images: [],
     categories: [],
     isFeatured: false,
-    isHot: false,
-    isNew: false,
     status: 'PENDING'
   });
   const [categories, setCategories] = useState([]);
@@ -39,8 +37,6 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
         images: product.images || [],
         categories: product.categories || [],
         isFeatured: product.isFeatured || false,
-        isHot: product.isHot || false,
-        isNew: product.isNew || false,
         status: product.status || 'PENDING'
       });
       // Handle both categoryIds (Set/Array) and categories (array of objects)
@@ -199,8 +195,6 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
         stock: parseInt(formData.stock) || 0,
         images: formData.images,
         isFeatured: formData.isFeatured,
-        isHot: formData.isHot,
-        isNew: formData.isNew,
         // Don't send status in regular updates - status should only be changed via approve/reject endpoints
         // This prevents accidental status reverts when editing other product fields
         // status: formData.status, // Removed to prevent accidental status changes
@@ -374,6 +368,48 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
             </div>
           </div>
 
+          {/* Shop Information (Admin only, when editing existing product) */}
+          {isAdmin && product && (product.sellerName || product.sellerId) && (
+            <div className="border-b pb-4">
+              <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Store className="w-5 h-5 mr-2 text-orange-600" />
+                Thông tin cửa hàng
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                {product.sellerName && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tên cửa hàng
+                    </label>
+                    <div className="text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                      {product.sellerName}
+                    </div>
+                  </div>
+                )}
+                {product.sellerEmail && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email cửa hàng
+                    </label>
+                    <div className="text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                      {product.sellerEmail}
+                    </div>
+                  </div>
+                )}
+                {product.sellerId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ID cửa hàng
+                    </label>
+                    <div className="text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                      {product.sellerId}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Categories */}
           <div className="border-b pb-4">
             <h4 className="text-lg font-medium text-gray-900 mb-4">
@@ -479,7 +515,7 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
           <div className="border-b pb-4">
             <h4 className="text-lg font-medium text-gray-900 mb-4">Tùy chọn</h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -490,29 +526,10 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
                 />
                 <span className="text-sm font-medium text-gray-700">Sản phẩm nổi bật</span>
               </label>
-
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isHot"
-                  checked={formData.isHot}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Sản phẩm hot</span>
-              </label>
-
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isNew"
-                  checked={formData.isNew}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Sản phẩm mới</span>
-              </label>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Lưu ý: Sản phẩm hot được xác định tự động dựa trên số lượng bán (soldCount). Sản phẩm mới được xác định tự động dựa trên ngày tạo (trong vòng 30 ngày).
+            </p>
 
             {isAdmin && (
               <div className="mt-4">

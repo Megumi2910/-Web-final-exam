@@ -21,6 +21,8 @@ public class UserInfo {
     private Boolean isVerified;
     private Boolean isSellerApproved;
     private String storeName;
+    private String storeDescription;
+    private String storeAddress;
     
     /**
      * Constructor to create UserInfo from User entity
@@ -37,5 +39,7 @@ public class UserInfo {
         this.isVerified = user.getIsVerified();
         this.isSellerApproved = user.getIsSellerApproved();
         this.storeName = user.getStoreName();
+        this.storeDescription = user.getStoreDescription();
+        this.storeAddress = user.getStoreAddress();
     }
 }

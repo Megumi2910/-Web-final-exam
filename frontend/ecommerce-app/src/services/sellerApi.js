@@ -3,9 +3,7 @@ import api from './api';
 export const sellerApi = {
   // Get seller's products
   getMyProducts: (page = 0, size = 20) => {
-    // Note: This will need the seller's ID from auth context
-    // For now, we'll use the current user's ID
-    return api.get(`/products/seller/me?page=${page}&size=${size}`);
+    return api.get(`/seller/products?page=${page}&size=${size}`);
   },
 
   // Get seller's orders
@@ -22,6 +20,11 @@ export const sellerApi = {
   // Get seller dashboard stats (alias for getStatistics)
   getDashboardStats: () => {
     return api.get('/seller/statistics');
+  },
+
+  // Update seller profile (store name, description, address)
+  updateProfile: (data) => {
+    return api.put('/seller/profile', data);
   },
 };
 

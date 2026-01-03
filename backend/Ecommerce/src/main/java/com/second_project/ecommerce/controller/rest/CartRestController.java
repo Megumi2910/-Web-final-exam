@@ -26,6 +26,11 @@ public class CartRestController {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Unverified users cannot access cart (same as guests)
+        if (!user.getIsVerified()) {
+            throw new IllegalArgumentException("Please verify your email to access cart");
+        }
+
         CartDto cartDto = cartService.getCartDto(user);
         return ResponseEntity.ok(ApiResponse.success("Cart retrieved successfully", cartDto));
     }
@@ -38,6 +43,11 @@ public class CartRestController {
 
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Unverified users cannot add to cart (same as guests)
+        if (!user.getIsVerified()) {
+            throw new IllegalArgumentException("Please verify your email to add items to cart");
+        }
 
         CartDto cartDto = cartService.addItemDto(user, productId, quantity);
         return ResponseEntity.ok(ApiResponse.success("Item added to cart successfully", cartDto));
@@ -68,6 +78,11 @@ public class CartRestController {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Unverified users cannot update cart (same as guests)
+        if (!user.getIsVerified()) {
+            throw new IllegalArgumentException("Please verify your email to update cart");
+        }
+
         CartDto cartDto = cartService.updateItemQuantityDto(user, cartItemId, quantity);
         return ResponseEntity.ok(ApiResponse.success("Cart item updated successfully", cartDto));
     }
@@ -79,6 +94,11 @@ public class CartRestController {
 
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Unverified users cannot remove from cart (same as guests)
+        if (!user.getIsVerified()) {
+            throw new IllegalArgumentException("Please verify your email to modify cart");
+        }
 
         CartDto cartDto = cartService.removeItemDto(user, cartItemId);
         return ResponseEntity.ok(ApiResponse.success("Cart item removed successfully", cartDto));
@@ -97,6 +117,11 @@ public class CartRestController {
     public ResponseEntity<ApiResponse<Integer>> getCartItemCount(@AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Unverified users return 0 cart count (same as guests)
+        if (!user.getIsVerified()) {
+            return ResponseEntity.ok(ApiResponse.success("Cart item count retrieved successfully", 0));
+        }
 
         CartDto cartDto = cartService.getCartDto(user);
         // Return count of unique products (different items), not total quantity

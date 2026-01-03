@@ -39,6 +39,7 @@ public interface ProductService {
     List<ProductDto> findNewProductsDtos(int limit);
     List<ProductDto> findHotProductsDtos(int limit);
     Page<ProductDto> findByCategoryIdDtos(Long categoryId, Pageable pageable);
+    Page<ProductDto> findBySellerIdDtos(Long sellerId, Pageable pageable);
     Page<ProductDto> findPendingProductsDtos(Pageable pageable);
     ProductDto saveDto(ProductDto productDto);
     ProductDto updateDto(Long id, ProductDto productDto);

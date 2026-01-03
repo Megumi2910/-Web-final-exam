@@ -7,7 +7,8 @@ const ProductGrid = ({
   onAddToCart,
   onToggleWishlist,
   wishlistItems = [],
-  className = ''
+  className = '',
+  isHot = false
 }) => {
   const gridCols = {
     2: 'grid-cols-2',
@@ -35,6 +36,7 @@ const ProductGrid = ({
           onAddToCart={onAddToCart}
           onToggleWishlist={onToggleWishlist}
           isWishlisted={wishlistItems.includes(product.id)}
+          isHot={isHot}
         />
       ))}
     </div>

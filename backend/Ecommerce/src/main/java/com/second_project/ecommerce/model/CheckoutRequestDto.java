@@ -26,5 +26,10 @@ public class CheckoutRequestDto {
 
     // Selected cart item IDs (comma-separated) - for future use if needed
     private String selectedCartItemIds;
+    
+    // For "Buy Now" - direct product order (not from cart)
+    private Long productId; // Product ID for buy-now
+    private Integer quantity; // Quantity for buy-now
+    private Boolean isBuyNow = false; // Flag to indicate buy-now order
 }
 

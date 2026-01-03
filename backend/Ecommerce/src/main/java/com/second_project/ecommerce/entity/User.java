@@ -75,6 +75,9 @@ public class User {
     
     private String storeDescription;
     
+    @Column(name = "store_address")
+    private String storeAddress;
+    
     @Column(name = "is_seller_approved")
     private Boolean isSellerApproved = false;
     

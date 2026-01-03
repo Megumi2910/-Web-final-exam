@@ -136,7 +136,7 @@ const OrderDetailPage = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -156,7 +156,7 @@ const OrderDetailPage = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -313,24 +313,24 @@ const OrderDetailPage = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tạm tính:</span>
-                    <span className="font-medium">{formatCurrency(order.subtotal || 0)}</span>
+                    <span className="font-medium text-right">{formatCurrency(order.subtotal || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Phí vận chuyển:</span>
-                    <span className="font-medium">{formatCurrency(order.shippingFee || 0)}</span>
+                    <span className="font-medium text-right">{formatCurrency(order.shippingFee || 0)}</span>
                   </div>
                   {order.discount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Giảm giá:</span>
-                      <span className="font-medium text-green-600">
+                      <span className="font-medium text-green-600 text-right">
                         -{formatCurrency(order.discount)}
                       </span>
                     </div>
                   )}
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex justify-between">
+                  <div className="border-t border-gray-200 pt-3 mt-4">
+                    <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-900">Tổng thanh toán:</span>
-                      <span className="text-xl font-bold text-shopee-orange">
+                      <span className="text-xl font-bold text-shopee-orange text-right">
                         {formatCurrency(order.totalAmount)}
                       </span>
                     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -11,7 +11,8 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Store
 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { productApi } from '../../services/productApi';
@@ -132,6 +133,7 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
 const AdminProducts = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedSellerId, setSelectedSellerId] = useState(null); // null = all shops
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [products, setProducts] = useState([]);
@@ -169,6 +171,25 @@ const AdminProducts = () => {
     }
   };
 
+  // Extract unique shops from products
+  const shops = useMemo(() => {
+    const shopMap = new Map();
+    products.forEach(product => {
+      if (product.sellerId && product.sellerName) {
+        if (!shopMap.has(product.sellerId)) {
+          shopMap.set(product.sellerId, {
+            id: product.sellerId,
+            name: product.sellerName,
+            email: product.sellerEmail,
+            productCount: 0
+          });
+        }
+        shopMap.get(product.sellerId).productCount++;
+      }
+    });
+    return Array.from(shopMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products]);
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          product.id?.toString().includes(searchQuery) ||
@@ -176,7 +197,8 @@ const AdminProducts = () => {
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && product.status === 'APPROVED') ||
                          (filterStatus === 'inactive' && product.status !== 'APPROVED');
-    return matchesSearch && matchesStatus;
+    const matchesSeller = selectedSellerId === null || product.sellerId === selectedSellerId;
+    return matchesSearch && matchesStatus && matchesSeller;
   });
 
   const handleEdit = (product) => {
@@ -242,28 +264,83 @@ const AdminProducts = () => {
   };
 
   const stats = {
-    total: products.length,
-    active: products.filter(p => p.status === 'APPROVED').length,
-    lowStock: products.filter(p => p.stock > 0 && p.stock <= 10).length,
-    outOfStock: products.filter(p => p.stock === 0).length
+    total: filteredProducts.length,
+    active: filteredProducts.filter(p => p.status === 'APPROVED').length,
+    lowStock: filteredProducts.filter(p => p.stock > 0 && p.stock <= 10).length,
+    outOfStock: filteredProducts.filter(p => p.stock === 0).length
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý sản phẩm</h1>
-          <p className="text-gray-600">Quản lý danh sách sản phẩm trong cửa hàng</p>
+    <div className="flex gap-6">
+      {/* Shops Sidebar */}
+      <div className="w-64 flex-shrink-0">
+        <div className="bg-white rounded-lg shadow p-4 sticky top-4">
+          <div className="flex items-center space-x-2 mb-4">
+            <Store className="w-5 h-5 text-orange-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Cửa hàng</h2>
+          </div>
+          <div className="space-y-1">
+            <button
+              onClick={() => setSelectedSellerId(null)}
+              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                selectedSellerId === null
+                  ? 'bg-orange-50 text-orange-600 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span>Tất cả cửa hàng</span>
+                <span className="text-xs text-gray-500">({products.length})</span>
+              </div>
+            </button>
+            {shops.map(shop => (
+              <button
+                key={shop.id}
+                onClick={() => setSelectedSellerId(shop.id)}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  selectedSellerId === shop.id
+                    ? 'bg-orange-50 text-orange-600 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{shop.name}</div>
+                    {shop.email && (
+                      <div className="text-xs text-gray-500 truncate">{shop.email}</div>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500 ml-2">({shop.productCount})</span>
+                </div>
+              </button>
+            ))}
+          </div>
+          {shops.length === 0 && !loading && (
+            <p className="text-sm text-gray-500 text-center py-4">Chưa có cửa hàng nào</p>
+          )}
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Thêm sản phẩm</span>
-        </button>
       </div>
+
+      {/* Main Content */}
+      <div className="flex-1 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Sản phẩm</h1>
+            <p className="text-gray-600">
+              {selectedSellerId 
+                ? `Sản phẩm của ${shops.find(s => s.id === selectedSellerId)?.name || 'cửa hàng'}`
+                : 'Quản lý danh sách sản phẩm trong cửa hàng'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm sản phẩm</span>
+          </button>
+        </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -414,6 +491,7 @@ const AdminProducts = () => {
           isAdmin={true}
         />
       )}
+      </div>
     </div>
   );
 };

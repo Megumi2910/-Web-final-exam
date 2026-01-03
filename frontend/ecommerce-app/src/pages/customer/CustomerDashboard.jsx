@@ -38,7 +38,13 @@ const CustomerDashboard = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [walletBalance] = useState(500000); // TODO: Implement wallet API when available
+  const [walletBalance, setWalletBalance] = useState(0); // Wallet not implemented yet, set to 0
+  const [dashboardStats, setDashboardStats] = useState({
+    totalSpending: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    successRate: 100
+  });
 
   useEffect(() => {
     if (!authLoading) {
@@ -97,6 +103,19 @@ const CustomerDashboard = () => {
           rating: product.averageRating || 0
         })));
       }
+
+      // Fetch dashboard statistics (total spending, addresses, etc.)
+      const dashboardResponse = await orderApi.getDashboardStatistics();
+      if (dashboardResponse.data.success) {
+        const stats = dashboardResponse.data.data;
+        setDashboardStats({
+          totalSpending: stats.totalSpending || 0,
+          completedOrders: stats.completedOrders || 0,
+          cancelledOrders: stats.cancelledOrders || 0,
+          successRate: stats.successRate || 100,
+          addresses: stats.addresses || []
+        });
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -113,27 +132,9 @@ const CustomerDashboard = () => {
   };
 
 
-  // Mock addresses (TODO: Implement address API)
-  const addresses = [
-    {
-      id: 1,
-      name: 'Nhà riêng',
-      fullName: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '123 Đường ABC, Phường XYZ',
-      city: 'TP. Hồ Chí Minh',
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: 'Văn phòng',
-      fullName: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '456 Đường DEF, Quận 1',
-      city: 'TP. Hồ Chí Minh',
-      isDefault: false
-    }
-  ];
+  // Get user's address from profile
+  const userAddress = user?.address || '';
+  const hasAddress = userAddress && userAddress.trim().length > 0;
 
   const getStatusBadge = (status) => {
     const statusMap = {
@@ -507,7 +508,12 @@ const CustomerDashboard = () => {
                     </Badge>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-4"
+                  onClick={() => navigate('/customer/profile')}
+                >
                   Chỉnh sửa hồ sơ
                 </Button>
               </Card.Content>
@@ -521,38 +527,34 @@ const CustomerDashboard = () => {
                     <MapPin className="w-5 h-5 text-gray-400" />
                     Địa chỉ giao hàng
                   </Card.Title>
-                  <button className="text-shopee-orange hover:text-shopee-orange-dark text-sm font-medium">
-                    Thêm
+                  <button 
+                    className="text-shopee-orange hover:text-shopee-orange-dark text-sm font-medium"
+                    onClick={() => navigate('/customer/profile')}
+                  >
+                    {hasAddress ? 'Sửa' : 'Thêm'}
                   </button>
                 </div>
               </Card.Header>
               <Card.Content>
                 <div className="space-y-3">
-                  {addresses.map((address) => (
-                    <div 
-                      key={address.id}
-                      className={clsx(
-                        'p-3 rounded-lg border transition-colors cursor-pointer',
-                        address.isDefault 
-                          ? 'border-shopee-orange bg-orange-50' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
+                  {!hasAddress ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      Chưa có địa chỉ giao hàng
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg border border-shopee-orange bg-orange-50">
                       <div className="flex items-start justify-between mb-2">
                         <div className="font-medium text-gray-900 text-sm">
-                          {address.name}
+                          Địa chỉ mặc định
                         </div>
-                        {address.isDefault && (
-                          <Badge variant="primary" size="sm">Mặc định</Badge>
-                        )}
+                        <Badge variant="primary" size="sm">Mặc định</Badge>
                       </div>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <div>{address.fullName} | {address.phone}</div>
-                        <div>{address.address}</div>
-                        <div>{address.city}</div>
+                        <div>{user?.firstName} {user?.lastName} | {user?.phoneNumber}</div>
+                        <div>{userAddress}</div>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </Card.Content>
             </Card>
@@ -566,28 +568,30 @@ const CustomerDashboard = () => {
                 </Card.Title>
               </Card.Header>
               <Card.Content>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Tổng chi tiêu:</span>
-                    <span className="text-lg font-bold text-shopee-orange">
-                      {formatCurrency(32878000)}
-                    </span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Tổng chi tiêu:</span>
+                      <span className="text-lg font-bold text-shopee-orange">
+                        {formatCurrency(dashboardStats.totalSpending)}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Đã mua:</span>
+                        <span className="font-medium">{dashboardStats.completedOrders} đơn</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Đã hủy:</span>
+                        <span className="font-medium">{dashboardStats.cancelledOrders} đơn</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Tỷ lệ thành công:</span>
+                        <span className="font-medium text-green-500">
+                          {dashboardStats.successRate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Đã mua:</span>
-                      <span className="font-medium">{orderStats.completed} đơn</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Đã hủy:</span>
-                      <span className="font-medium">{orderStats.cancelled} đơn</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Tỷ lệ thành công:</span>
-                      <span className="font-medium text-green-500">100%</span>
-                    </div>
-                  </div>
-                </div>
               </Card.Content>
             </Card>
           </div>

@@ -29,12 +29,12 @@ const InfoCard = ({ title, icon: Icon, children }) => {
 };
 
 const SellerStore = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [storeInfo, setStoreInfo] = useState({
     name: user?.storeName || '',
     description: user?.storeDescription || '',
-    address: user?.address || '',
+    address: user?.storeAddress || '', // Use storeAddress, not user address
     phone: user?.phoneNumber || '',
     email: user?.email || '',
     website: '',
@@ -72,7 +72,7 @@ const SellerStore = () => {
         ...prev,
         name: user.storeName || '',
         description: user.storeDescription || '',
-        address: user.address || '',
+        address: user.storeAddress || '', // Use storeAddress, not user address
         phone: user.phoneNumber || '',
         email: user.email || ''
       }));
@@ -100,11 +100,20 @@ const SellerStore = () => {
     }
   };
 
-  const handleSave = () => {
-    console.log('Saving store info:', storeInfo);
-    setIsEditing(false);
-    // Here you would typically save to backend
-    alert('Thông tin cửa hàng đã được cập nhật!');
+  const handleSave = async () => {
+    try {
+      await sellerApi.updateProfile({
+        storeName: storeInfo.name,
+        storeDescription: storeInfo.description,
+        storeAddress: storeInfo.address
+      });
+      setIsEditing(false);
+      await refreshUser(); // Refresh user context to get updated store info
+      alert('Thông tin cửa hàng đã được cập nhật!');
+    } catch (error) {
+      console.error('Error saving store info:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin cửa hàng. Vui lòng thử lại.');
+    }
   };
 
   const handleInputChange = (field, value) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, SlidersHorizontal, X, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, X, Star, SearchX } from 'lucide-react';
 import { Input, Button } from '../components/ui';
 import { ProductGrid } from '../components/product';
 import { productApi } from '../services/productApi';
@@ -48,45 +48,49 @@ const SearchPage = () => {
     fetchCategories();
   }, []);
 
+  // Helper function to map product data
+  const mapProductData = (product) => ({
+    id: product.id,
+    name: product.name,
+    price: product.price ? parseFloat(product.price) : 0,
+    originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
+    discount: product.discountPercentage || (product.originalPrice && product.price 
+      ? Math.round(((parseFloat(product.originalPrice) - parseFloat(product.price)) / parseFloat(product.originalPrice)) * 100)
+      : 0),
+    rating: product.averageRating || 0,
+    reviewCount: product.reviews?.length || 0,
+    image: product.images && product.images.length > 0 
+      ? product.images[0] 
+      : 'https://via.placeholder.com/300',
+    shop: product.seller?.fullName || product.seller?.email || 'Shop',
+    category: product.categories && product.categories.length > 0 
+      ? product.categories[0].slug || product.categories[0].name.toLowerCase() 
+      : '',
+    location: '', // Not available in current Product entity
+    freeShipping: false, // Not available in current Product entity
+    sold: product.soldCount || 0
+  });
+
   // Fetch products from API when search term changes
   useEffect(() => {
     const fetchProducts = async () => {
       const keyword = searchTerm.trim();
       
-      // If no search term, show empty results or all products
-      if (!keyword) {
-        setProducts([]);
-        setTotalElements(0);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
-        const response = await productApi.searchProducts(keyword, 0, 100);
+        
+        let response;
+        // If no search term, fetch all products
+        if (!keyword) {
+          response = await productApi.getProducts(0, 100);
+        } else {
+          // If there's a search term, search for products
+          response = await productApi.searchProducts(keyword, 0, 100);
+        }
         
         if (response.data.success) {
-          const mappedProducts = (response.data.data || []).map(product => ({
-            id: product.id,
-            name: product.name,
-            price: product.price ? parseFloat(product.price) : 0,
-            originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
-            discount: product.discountPercentage || (product.originalPrice && product.price 
-              ? Math.round(((parseFloat(product.originalPrice) - parseFloat(product.price)) / parseFloat(product.originalPrice)) * 100)
-              : 0),
-            rating: product.averageRating || 0,
-            reviewCount: product.reviews?.length || 0,
-            image: product.images && product.images.length > 0 
-              ? product.images[0] 
-              : 'https://via.placeholder.com/300',
-            shop: product.seller?.fullName || product.seller?.email || 'Shop',
-            category: product.categories && product.categories.length > 0 
-              ? product.categories[0].slug || product.categories[0].name.toLowerCase() 
-              : '',
-            location: '', // Not available in current Product entity
-            freeShipping: false, // Not available in current Product entity
-            sold: product.soldCount || 0
-          }));
+          const mappedProducts = (response.data.data || []).map(mapProductData);
           
           setProducts(mappedProducts);
           setTotalElements(response.data.totalElements || mappedProducts.length);
@@ -96,7 +100,7 @@ const SearchPage = () => {
         }
       } catch (err) {
         console.error('Error fetching products:', err);
-        setError(err.response?.data?.message || 'Failed to search products');
+        setError(err.response?.data?.message || 'Failed to fetch products');
         setProducts([]);
       } finally {
         setLoading(false);
@@ -201,7 +205,7 @@ const SearchPage = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Search Header */}
       <div className="bg-white border-b sticky top-0 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex gap-4">
             <div className="flex-1">
               <form onSubmit={handleSearchSubmit}>
@@ -246,7 +250,7 @@ const SearchPage = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
           {/* Filters Sidebar */}
           <div className={`${showFilters ? 'block' : 'hidden'} lg:block w-64 flex-shrink-0`}>
@@ -376,12 +380,21 @@ const SearchPage = () => {
                   <span className="text-red-600">{error}</span>
                 ) : (
                   <>
-                    Tìm thấy <span className="font-semibold text-gray-900">{totalElements}</span> sản phẩm
-                    {searchTerm && (
-                      <span> cho "<span className="font-semibold text-gray-900">{searchTerm}</span>"</span>
-                    )}
-                    {filteredProducts.length !== totalElements && (
-                      <span> (hiển thị {filteredProducts.length} sau khi lọc)</span>
+                    {searchTerm ? (
+                      <>
+                        Tìm thấy <span className="font-semibold text-gray-900">{totalElements}</span> sản phẩm
+                        <span> cho "<span className="font-semibold text-gray-900">{searchTerm}</span>"</span>
+                        {filteredProducts.length !== totalElements && (
+                          <span> (hiển thị {filteredProducts.length} sau khi lọc)</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Hiển thị <span className="font-semibold text-gray-900">{totalElements}</span> sản phẩm
+                        {filteredProducts.length !== totalElements && (
+                          <span> (hiển thị {filteredProducts.length} sau khi lọc)</span>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -425,7 +438,7 @@ const SearchPage = () => {
               />
             ) : (
               <div className="bg-white rounded-lg shadow-sm p-16 text-center">
-                <div className="text-gray-400 text-6xl mb-4">🔍</div>
+                <SearchX className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Không tìm thấy sản phẩm</h3>
                 <p className="text-gray-600 mb-4">
                   {searchTerm 

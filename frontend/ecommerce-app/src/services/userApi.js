@@ -30,5 +30,10 @@ export const userApi = {
   resetPassword: (token, newPassword) => {
     return api.post('/user/reset-password', { token, newPassword });
   },
+
+  // Get shop information (public endpoint)
+  getShopInfo: (userId) => {
+    return api.get(`/user/${userId}/shop`);
+  },
 };
 

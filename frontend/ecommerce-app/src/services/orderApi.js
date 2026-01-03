@@ -38,6 +38,11 @@ export const orderApi = {
     return api.get('/orders/statistics');
   },
 
+  // Get dashboard statistics (total spending, addresses, etc.)
+  getDashboardStatistics: () => {
+    return api.get('/orders/dashboard-statistics');
+  },
+
   // Update order status (admin)
   updateOrderStatus: (id, status) => {
     return api.put(`/orders/${id}/status?status=${status}`);

@@ -12,6 +12,8 @@ const HomePage = () => {
   const [wishlistItems, setWishlistItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [hotProducts, setHotProducts] = useState([]);
+  const [newProducts, setNewProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,11 +36,15 @@ const HomePage = () => {
         })));
       }
 
-      // Fetch featured products
-      const featuredResponse = await productApi.getFeaturedProducts(8);
-      if (featuredResponse.data.success) {
-        const products = featuredResponse.data.data || [];
-        setFeaturedProducts(products.map(product => ({
+      // Helper function to map product data
+      const mapProductData = (product) => {
+        // Calculate isNew based on creation date (within 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const createdAt = product.createdAt ? new Date(product.createdAt) : null;
+        const isNew = createdAt && createdAt > thirtyDaysAgo;
+        
+        return {
           id: product.id,
           name: product.name,
           price: product.price ? parseFloat(product.price) : 0,
@@ -48,18 +54,37 @@ const HomePage = () => {
             : 0,
           rating: product.averageRating || 0,
           reviewCount: product.reviewCount || 0,
-          image: product.imageUrls && product.imageUrls.length > 0 
-            ? product.imageUrls[0] 
-            : product.imageUrl || 'https://via.placeholder.com/300',
+          image: product.images && product.images.length > 0 
+            ? product.images[0] 
+            : product.imageUrls && product.imageUrls.length > 0 
+              ? product.imageUrls[0] 
+              : product.imageUrl || 'https://via.placeholder.com/300',
           shop: product.sellerName || product.seller?.fullName || 'Shop',
-          isNew: product.isNew || false,
-          isHot: product.isHot || false,
+          isNew: isNew,
           slug: product.slug
-        })));
+        };
+      };
+
+      // Fetch featured products
+      const featuredResponse = await productApi.getFeaturedProducts(8);
+      if (featuredResponse.data.success) {
+        const products = featuredResponse.data.data || [];
+        setFeaturedProducts(products.map(mapProductData));
       }
 
-      // Note: New products and hot products can be fetched separately if needed
-      // For now, we're just showing featured products
+      // Fetch hot products (based on soldCount)
+      const hotResponse = await productApi.getHotProducts(8);
+      if (hotResponse.data.success) {
+        const products = hotResponse.data.data || [];
+        setHotProducts(products.map(mapProductData));
+      }
+
+      // Fetch new products
+      const newResponse = await productApi.getNewProducts(8);
+      if (newResponse.data.success) {
+        const products = newResponse.data.data || [];
+        setNewProducts(products.map(mapProductData));
+      }
     } catch (error) {
       console.error('Error fetching home data:', error);
     } finally {
@@ -149,7 +174,7 @@ const HomePage = () => {
           
           {/* Banner content */}
           <div className="absolute inset-0 flex items-center">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
               <div className="max-w-2xl">
                 <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
                   {banners[currentBanner].title}
@@ -195,7 +220,7 @@ const HomePage = () => {
 
       {/* Features */}
       <section className="py-8 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="flex items-center space-x-3">
               <div className="bg-shopee-orange/10 p-3 rounded-full">
@@ -239,7 +264,7 @@ const HomePage = () => {
 
       {/* Categories */}
       <section className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Danh mục sản phẩm</h2>
             <p className="text-gray-600">Khám phá hàng ngàn sản phẩm chất lượng</p>
@@ -259,7 +284,7 @@ const HomePage = () => {
 
       {/* Featured Products */}
       <section className="py-12 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Sản phẩm nổi bật</h2>
             <p className="text-gray-600">Những sản phẩm được yêu thích nhất</p>
@@ -267,7 +292,44 @@ const HomePage = () => {
           
           <ProductGrid
             products={featuredProducts}
-            columns={5}
+            columns={4}
+            onAddToCart={handleAddToCart}
+            onToggleWishlist={handleToggleWishlist}
+            wishlistItems={wishlistItems}
+          />
+        </div>
+      </section>
+
+      {/* Hot Products */}
+      <section className="py-12">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Sản phẩm hot</h2>
+            <p className="text-gray-600">Sản phẩm bán chạy nhất</p>
+          </div>
+          
+          <ProductGrid
+            products={hotProducts}
+            columns={4}
+            onAddToCart={handleAddToCart}
+            onToggleWishlist={handleToggleWishlist}
+            wishlistItems={wishlistItems}
+            isHot={true}
+          />
+        </div>
+      </section>
+
+      {/* New Products */}
+      <section className="py-12 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Sản phẩm mới</h2>
+            <p className="text-gray-600">Những sản phẩm mới nhất</p>
+          </div>
+          
+          <ProductGrid
+            products={newProducts}
+            columns={4}
             onAddToCart={handleAddToCart}
             onToggleWishlist={handleToggleWishlist}
             wishlistItems={wishlistItems}

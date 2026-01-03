@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -214,8 +215,53 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public OrderService.DashboardStatistics getDashboardStatistics(User user) {
+        OrderService.DashboardStatistics stats = new OrderService.DashboardStatistics();
+        
+        // Calculate total spending from completed orders
+        java.math.BigDecimal totalSpending = orderRepository.calculateTotalSpendingByUserId(user.getUserId());
+        stats.setTotalSpending(totalSpending != null ? totalSpending : java.math.BigDecimal.ZERO);
+        
+        // Get order counts
+        Long completedCount = orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.COMPLETED);
+        Long cancelledCount = orderRepository.countByUserIdAndOrderStatus(user.getUserId(), Order.OrderStatus.CANCELLED);
+        stats.setCompletedOrders(completedCount);
+        stats.setCancelledOrders(cancelledCount);
+        
+        // Calculate success rate
+        long totalFinalized = completedCount + cancelledCount;
+        double successRate = totalFinalized > 0 ? (completedCount.doubleValue() / totalFinalized) * 100 : 100.0;
+        stats.setSuccessRate(successRate);
+        
+        // Get distinct shipping addresses from recent orders (limit to 5)
+        java.util.List<String> addresses = new java.util.ArrayList<>();
+        // Add user's profile address if available
+        if (user.getAddress() != null && !user.getAddress().trim().isEmpty()) {
+            addresses.add(user.getAddress());
+        }
+        // Add distinct addresses from orders
+        Pageable pageable = PageRequest.of(0, 5);
+        java.util.List<String> orderAddresses = orderRepository.findDistinctShippingAddressesByUserId(user.getUserId(), pageable);
+        for (String addr : orderAddresses) {
+            if (addr != null && !addr.trim().isEmpty() && !addresses.contains(addr)) {
+                addresses.add(addr);
+            }
+        }
+        stats.setAddresses(addresses);
+        
+        return stats;
+    }
+
+    @Override
     public Order createOrderFromCart(User user, CheckoutRequestDto checkoutRequest) {
         log.info("Creating order from cart for user {}", user.getUserId());
+        
+        // Handle "Buy Now" - direct product order (not from cart)
+        if (checkoutRequest.getIsBuyNow() != null && checkoutRequest.getIsBuyNow() 
+            && checkoutRequest.getProductId() != null && checkoutRequest.getQuantity() != null) {
+            return createBuyNowOrder(user, checkoutRequest);
+        }
         
         // Get user's cart
         Cart cart = cartRepository.findByUser(user)
@@ -312,6 +358,94 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order created successfully: orderId={}, totalAmount={}", 
                  savedOrder.getId(), totalAmount);
 
+        return savedOrder;
+    }
+
+    /**
+     * Create order directly from product (Buy Now) - without adding to cart.
+     */
+    private Order createBuyNowOrder(User user, CheckoutRequestDto checkoutRequest) {
+        log.info("Creating buy-now order for user {}, productId={}, quantity={}", 
+                 user.getUserId(), checkoutRequest.getProductId(), checkoutRequest.getQuantity());
+        
+        // Get product
+        Product product = productService.findById(checkoutRequest.getProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + checkoutRequest.getProductId()));
+        
+        // Check if product is approved
+        if (product.getStatus() != Product.ProductStatus.APPROVED) {
+            throw new IllegalArgumentException("Product is not available: " + product.getName());
+        }
+        
+        // Check stock
+        Integer quantity = checkoutRequest.getQuantity();
+        if (product.getStock() < quantity) {
+            throw new IllegalArgumentException(
+                String.format("Insufficient stock for '%s'. Available: %d, Requested: %d",
+                             product.getName(),
+                             product.getStock(),
+                             quantity));
+        }
+        
+        // Validate payment method
+        Payment.PaymentMethod paymentMethod;
+        try {
+            paymentMethod = Payment.PaymentMethod.valueOf(checkoutRequest.getPaymentMethod().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid payment method: " + checkoutRequest.getPaymentMethod());
+        }
+        
+        // Calculate totals
+        BigDecimal unitPrice = product.getPrice();
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        BigDecimal shippingFee = BigDecimal.valueOf(30000); // Default shipping fee
+        BigDecimal discount = BigDecimal.ZERO;
+        BigDecimal totalAmount = subtotal.add(shippingFee).subtract(discount);
+        
+        // Create order
+        Order order = new Order();
+        order.setUser(user);
+        order.setSubtotal(subtotal);
+        order.setShippingFee(shippingFee);
+        order.setDiscount(discount);
+        order.setTotalAmount(totalAmount);
+        order.setOrderStatus(Order.OrderStatus.PENDING);
+        order.setDeliveryStatus(Order.DeliveryStatus.PENDING);
+        order.setShippingAddress(checkoutRequest.getShippingAddress());
+        order.setPhoneNumber(checkoutRequest.getPhoneNumber());
+        order.setNotes(checkoutRequest.getNotes());
+        order.setOrderDate(LocalDateTime.now());
+        
+        // Create order item
+        OrderItem orderItem = new OrderItem();
+        orderItem.setOrder(order);
+        orderItem.setProduct(product);
+        orderItem.setQuantity(quantity);
+        orderItem.setPrice(unitPrice);
+        orderItem.setProductVariant("Default"); // Buy now uses default variant
+        orderItem.setCreatedAt(LocalDateTime.now());
+        orderItem.setUpdatedAt(LocalDateTime.now());
+        order.addItem(orderItem);
+        
+        // Update stock
+        productService.decrementStock(product.getId(), quantity);
+        
+        // Save order (cascades to order items)
+        Order savedOrder = orderRepository.save(order);
+        
+        // Create payment
+        Payment payment = new Payment();
+        payment.setOrder(savedOrder);
+        payment.setPaymentMethod(paymentMethod);
+        payment.setPaymentStatus(Payment.PaymentStatus.PENDING);
+        payment.setAmount(totalAmount);
+        payment.setTransactionId(generateTransactionCode());
+        savedOrder.setPayment(payment);
+        paymentRepository.save(payment);
+        
+        log.info("Buy-now order created successfully: orderId={}, totalAmount={}", 
+                 savedOrder.getId(), totalAmount);
+        
         return savedOrder;
     }
 

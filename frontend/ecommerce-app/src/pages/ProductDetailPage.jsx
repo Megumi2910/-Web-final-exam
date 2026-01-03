@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVerified } = useAuth();
   const [product, setProduct] = useState(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -37,6 +37,7 @@ const ProductDetailPage = () => {
         ...productData,
         images: productData.imageUrls || [productData.imageUrl].filter(Boolean),
         shop: productData.sellerName || 'N/A',
+        sellerId: productData.sellerId, // Store sellerId for navigation
         originalPrice: productData.originalPrice || productData.price,
         discount: productData.originalPrice ? Math.round(((productData.originalPrice - productData.price) / productData.originalPrice) * 100) : 0,
         variants: productData.variants || [],
@@ -76,6 +77,12 @@ const ProductDetailPage = () => {
       return;
     }
 
+    // Unverified users cannot add to cart (same as guests)
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
     try {
       const quantity = productData.quantity || 1;
       await cartApi.addToCart(productData.id, quantity);
@@ -97,60 +104,43 @@ const ProductDetailPage = () => {
       return;
     }
 
+    // Unverified users cannot buy now (same as guests)
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để mua hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
     try {
       const quantity = productData.quantity || 1;
-      await cartApi.buyNow(productData.id, quantity);
+      const selectedVariant = productData.selectedVariant || 'Default';
       
-      // Fetch cart to get the added item
-      const cartResponse = await cartApi.getCart();
-      if (cartResponse.data.success) {
-        const cart = cartResponse.data.data;
-        
-        // Group items by seller for checkout format
-        // CartItemDto has flattened product fields
-        const itemsBySeller = {};
-        
-        cart.items?.forEach(item => {
-          const sellerId = item.sellerId || 0;
-          const sellerName = item.sellerName || 'Shop';
-          
-          if (!itemsBySeller[sellerId]) {
-            itemsBySeller[sellerId] = {
-              shopId: sellerId,
-              shopName: sellerName,
-              products: []
-            };
-          }
-          
-          itemsBySeller[sellerId].products.push({
-            id: item.id, // cart item ID
-            productId: item.productId,
-            name: item.productName || 'Product',
-            image: item.productImageUrl || item.productImages?.[0] || 'https://via.placeholder.com/100',
-            variant: item.productVariant || 'Default',
-            price: parseFloat(item.unitPrice || item.totalPrice || item.productPrice || 0),
-            originalPrice: parseFloat(item.productOriginalPrice || item.productPrice || 0),
-            quantity: item.quantity,
-            stock: item.productStock || 0,
+      // Format product data directly for checkout (without adding to cart)
+      const checkoutData = {
+        cartItems: [{
+          shopId: product.sellerId || 0,
+          shopName: product.sellerName || product.storeName || 'Shop',
+          products: [{
+            id: `temp-${product.id}`, // Temporary ID for buy now (not a cart item)
+            productId: product.id,
+            name: product.name || 'Product',
+            image: product.images?.[0] || 'https://via.placeholder.com/100',
+            variant: selectedVariant,
+            price: parseFloat(product.price || 0),
+            originalPrice: parseFloat(product.originalPrice || product.price || 0),
+            quantity: quantity,
+            stock: product.stock || 0,
             freeShip: false
-          });
-        });
-        
-        // Format cart data for checkout page
-        const checkoutData = {
-          cartItems: Object.values(itemsBySeller),
-          subtotal: parseFloat(cart.totalAmount || 0),
-          shipping: 0, // Will be calculated on checkout page
-          discount: 0,
-          total: parseFloat(cart.totalAmount || 0)
-        };
-        
-        // Navigate to checkout with formatted data
-        navigate('/checkout', { state: checkoutData });
-      } else {
-        // Fallback: just navigate to checkout
-        navigate('/checkout');
-      }
+          }]
+        }],
+        subtotal: parseFloat(product.price || 0) * quantity,
+        shipping: 0, // Will be calculated on checkout page
+        discount: 0,
+        total: parseFloat(product.price || 0) * quantity,
+        isBuyNow: true // Flag to indicate this is a buy-now order (not from cart)
+      };
+      
+      // Navigate directly to checkout without adding to cart
+      navigate('/checkout', { state: checkoutData });
     } catch (error) {
       console.error('Failed to buy now:', error);
       alert(error.response?.data?.message || 'Không thể thực hiện mua ngay');
@@ -250,7 +240,18 @@ const ProductDetailPage = () => {
                 <div className="text-sm text-gray-600 mt-1">Online 2 giờ trước</div>
               </div>
             </div>
-            <Button variant="outline" size="lg" className="border-shopee-orange text-shopee-orange hover:bg-shopee-orange hover:text-white">
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="border-shopee-orange text-shopee-orange hover:bg-shopee-orange hover:text-white"
+              onClick={() => {
+                if (product.sellerId) {
+                  navigate(`/shop/${product.sellerId}`);
+                } else {
+                  alert('Không tìm thấy thông tin shop');
+                }
+              }}
+            >
               Xem shop
             </Button>
           </div>

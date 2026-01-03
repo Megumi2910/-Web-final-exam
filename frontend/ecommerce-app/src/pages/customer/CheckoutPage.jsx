@@ -134,12 +134,22 @@ const CheckoutPage = () => {
     }
 
     try {
-      const response = await orderApi.checkout({
+      const checkoutPayload = {
         shippingAddress: shippingAddress.trim(),
         phoneNumber: phoneNumber.trim(),
         paymentMethod: selectedPayment,
         notes: note || ''
-      });
+      };
+      
+      // If this is a buy-now order, include product data
+      if (checkoutData.isBuyNow && checkoutData.cartItems?.[0]?.products?.[0]) {
+        const product = checkoutData.cartItems[0].products[0];
+        checkoutPayload.isBuyNow = true;
+        checkoutPayload.productId = product.productId;
+        checkoutPayload.quantity = product.quantity;
+      }
+      
+      const response = await orderApi.checkout(checkoutPayload);
 
       if (response.data.success) {
         const order = response.data.data;

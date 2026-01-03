@@ -107,6 +107,25 @@ public class ProductRestController {
         ));
     }
 
+    @GetMapping("/seller/{sellerId}")
+    public ResponseEntity<PageResponse<ProductDto>> getProductsBySeller(
+            @PathVariable Long sellerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ProductDto> productPage = productService.findBySellerIdDtos(sellerId, pageable);
+        
+        return ResponseEntity.ok(PageResponse.success(
+                "Products by seller retrieved successfully",
+                productPage.getContent(),
+                productPage.getNumber(),
+                productPage.getSize(),
+                productPage.getTotalElements(),
+                productPage.getTotalPages()
+        ));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDto>> getProductById(@PathVariable Long id) {
         ProductDto product = productService.findDtoById(id)

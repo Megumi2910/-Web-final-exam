@@ -171,6 +171,7 @@ const ResetPasswordPage = () => {
                 />
                 <button
                   type="button"
+                  tabIndex={-1}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
@@ -208,6 +209,7 @@ const ResetPasswordPage = () => {
                 />
                 <button
                   type="button"
+                  tabIndex={-1}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >

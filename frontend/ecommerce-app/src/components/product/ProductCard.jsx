@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Star, ShoppingCart } from 'lucide-react';
+import { Flame, Star, ShoppingCart } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import { clsx } from 'clsx';
 
@@ -9,7 +9,8 @@ const ProductCard = ({
   className = '',
   onAddToCart,
   onToggleWishlist,
-  isWishlisted = false 
+  isWishlisted = false,
+  isHot = false
 }) => {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
@@ -25,8 +26,7 @@ const ProductCard = ({
     reviewCount,
     image,
     shop,
-    isNew = false,
-    isHot = false
+    isNew = false
   } = product;
 
   const handleAddToCart = (e) => {
@@ -34,10 +34,6 @@ const ProductCard = ({
     onAddToCart?.(product);
   };
 
-  const handleToggleWishlist = (e) => {
-    e.stopPropagation();
-    onToggleWishlist?.(product);
-  };
 
   const handleProductClick = () => {
     navigate(`/product/${id}`);
@@ -80,7 +76,6 @@ const ProductCard = ({
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {isNew && <Badge variant="primary" size="sm">Mới</Badge>}
-          {isHot && <Badge variant="danger" size="sm">Hot</Badge>}
           {discount > 0 && (
             <Badge variant="primary" size="sm">
               -{discount}%
@@ -88,18 +83,14 @@ const ProductCard = ({
           )}
         </div>
 
-        {/* Wishlist button */}
-        <button
-          onClick={handleToggleWishlist}
-          className="absolute top-2 right-2 p-2 bg-white/80 hover:bg-white rounded-full transition-colors"
-        >
-          <Heart 
-            className={clsx(
-              'w-4 h-4 transition-colors',
-              isWishlisted ? 'text-red-500 fill-current' : 'text-gray-600'
-            )} 
-          />
-        </button>
+        {/* Hot icon for hot products */}
+        {isHot && (
+          <div className="absolute top-2 right-2">
+            <div className="bg-red-500 text-white rounded-full p-1.5 shadow-lg">
+              <Flame className="w-4 h-4 fill-current" />
+            </div>
+          </div>
+        )}
 
         {/* Add to cart button */}
         <div className="absolute inset-x-0 bottom-0 p-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">

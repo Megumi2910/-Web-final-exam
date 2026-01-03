@@ -225,6 +225,9 @@ public class SellerRestController {
         if (request.getStoreDescription() != null) {
             seller.setStoreDescription(request.getStoreDescription());
         }
+        if (request.getStoreAddress() != null) {
+            seller.setStoreAddress(request.getStoreAddress());
+        }
 
         User updatedSeller = userService.save(seller);
         log.info("Seller profile updated for seller {}", seller.getUserId());
@@ -320,6 +323,7 @@ public class SellerRestController {
     public static class UpdateSellerProfileRequest {
         private String storeName;
         private String storeDescription;
+        private String storeAddress;
     }
     
     @Data

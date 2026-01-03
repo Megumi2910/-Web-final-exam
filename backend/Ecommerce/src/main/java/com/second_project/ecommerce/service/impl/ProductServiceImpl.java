@@ -257,9 +257,15 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductDto> findNewProductsDtos(int limit) {
-        List<Product> products = productRepository.findByIsNewTrueAndStatusOrderByCreatedAtDesc(Product.ProductStatus.APPROVED);
-        return products.stream()
+        // Get new products based on creation date (within 30 days), not isNew flag
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Product> products = productRepository.findByStatus(Product.ProductStatus.APPROVED, PageRequest.of(0, 1000))
+                .stream()
+                .filter(p -> p.getCreatedAt() != null && p.getCreatedAt().isAfter(thirtyDaysAgo))
+                .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
                 .limit(limit)
+                .collect(Collectors.toList());
+        return products.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -267,9 +273,11 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductDto> findHotProductsDtos(int limit) {
-        List<Product> products = productRepository.findByIsHotTrueAndStatus(Product.ProductStatus.APPROVED, PageRequest.of(0, limit))
+        // Get hot products based on soldCount (buy counts), not isHot flag
+        List<Product> products = productRepository.findByStatus(Product.ProductStatus.APPROVED, PageRequest.of(0, 1000))
                 .stream()
                 .sorted((p1, p2) -> Integer.compare(p2.getSoldCount(), p1.getSoldCount()))
+                .limit(limit)
                 .collect(Collectors.toList());
         return products.stream()
                 .map(this::convertToDto)
@@ -280,6 +288,16 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Page<ProductDto> findByCategoryIdDtos(Long categoryId, Pageable pageable) {
         Page<Product> productPage = productRepository.findByCategoryIdAndStatus(categoryId, Product.ProductStatus.APPROVED, pageable);
+        List<ProductDto> dtos = productPage.getContent().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+        return new PageImpl<>(dtos, pageable, productPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductDto> findBySellerIdDtos(Long sellerId, Pageable pageable) {
+        Page<Product> productPage = productRepository.findBySellerIdAndStatus(sellerId, Product.ProductStatus.APPROVED, pageable);
         List<ProductDto> dtos = productPage.getContent().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
@@ -403,9 +421,11 @@ public class ProductServiceImpl implements ProductService {
                         Optional<User> sellerOpt = userService.findById(sellerId);
                         if (sellerOpt.isPresent()) {
                             User seller = sellerOpt.get();
-                            String firstName = seller.getFirstName() != null ? seller.getFirstName() : "";
-                            String lastName = seller.getLastName() != null ? seller.getLastName() : "";
-                            dto.setSellerName((firstName + " " + lastName).trim());
+                            // Use store name if available, otherwise use seller's full name
+                            String sellerName = seller.getStoreName() != null && !seller.getStoreName().trim().isEmpty()
+                                ? seller.getStoreName()
+                                : ((seller.getFirstName() != null ? seller.getFirstName() : "") + " " + (seller.getLastName() != null ? seller.getLastName() : "")).trim();
+                            dto.setSellerName(sellerName);
                             dto.setSellerEmail(seller.getEmail() != null ? seller.getEmail() : "");
                         }
                     }
@@ -479,7 +499,11 @@ public class ProductServiceImpl implements ProductService {
             if (product.getSeller() != null) {
                 User seller = product.getSeller();
                 dto.setSellerId(seller.getUserId());
-                dto.setSellerName(seller.getFirstName() + " " + seller.getLastName());
+                // Use store name if available, otherwise use seller's full name
+                String sellerName = seller.getStoreName() != null && !seller.getStoreName().trim().isEmpty()
+                    ? seller.getStoreName()
+                    : (seller.getFirstName() + " " + seller.getLastName()).trim();
+                dto.setSellerName(sellerName);
                 dto.setSellerEmail(seller.getEmail());
             }
         } catch (Exception e) {
