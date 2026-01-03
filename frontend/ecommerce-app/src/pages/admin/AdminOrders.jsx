@@ -169,12 +169,19 @@ const AdminOrders = () => {
       setLoading(true);
       setError(null);
       const response = await adminApi.getAllOrders(page, 10);
-      const data = response.data.data;
-      setOrders(data.content || []);
-      setTotalPages(data.totalPages || 0);
+      console.log('Orders API response:', response.data); // Debug log
+      if (response.data.success) {
+        // PageResponse structure: data.data is the list, pagination fields are at response.data level
+        const ordersList = response.data.data || [];
+        setOrders(ordersList);
+        setTotalPages(response.data.totalPages || 0);
+      } else {
+        setError(response.data.message || 'Failed to fetch orders');
+        setOrders([]);
+      }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
-      setError('Không thể tải danh sách đơn hàng');
+      setError(err.response?.data?.message || err.message || 'Không thể tải danh sách đơn hàng');
       setOrders([]);
     } finally {
       setLoading(false);

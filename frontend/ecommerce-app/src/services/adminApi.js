@@ -3,7 +3,7 @@ import api from './api';
 export const adminApi = {
   // Get all orders (admin)
   getAllOrders: (page = 0, size = 10) => {
-    return api.get(`/orders?page=${page}&size=${size}`);
+    return api.get(`/orders/all?page=${page}&size=${size}`);
   },
 
   // Update order status (admin)

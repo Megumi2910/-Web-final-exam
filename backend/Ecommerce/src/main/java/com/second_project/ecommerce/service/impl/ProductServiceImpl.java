@@ -32,6 +32,8 @@ public class ProductServiceImpl implements ProductService {
     private final ReviewRepository reviewRepository;
     private final CategoryService categoryService;
     private final com.second_project.ecommerce.service.UserService userService;
+    private final com.second_project.ecommerce.repository.CartItemRepository cartItemRepository;
+    private final com.second_project.ecommerce.repository.OrderItemRepository orderItemRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -114,11 +116,37 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
-        productRepository.delete(product);
-        log.info("Product deleted: {}", id);
+        
+        // Check for order items (historical data - we should preserve these)
+        boolean hasOrderItems = product.getOrderItems() != null && !product.getOrderItems().isEmpty();
+        
+        // Remove cart items (these are not historical, safe to delete)
+        try {
+            int cartItemsRemoved = cartItemRepository.findByProductId(id).size();
+            if (cartItemsRemoved > 0) {
+                cartItemRepository.deleteByProductId(id);
+                log.info("Removed {} cart items for product {}", cartItemsRemoved, id);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to remove cart items for product {}: {}", id, e.getMessage());
+        }
+        
+        // Soft delete: Mark product as DISCONTINUED instead of hard delete
+        // This preserves data integrity for order history while removing product from active listings
+        product.setStatus(Product.ProductStatus.DISCONTINUED);
+        product.setUpdatedAt(LocalDateTime.now());
+        productRepository.save(product);
+        
+        if (hasOrderItems) {
+            log.info("Product {} marked as DISCONTINUED (has {} order items - preserved for history)", 
+                    id, product.getOrderItems().size());
+        } else {
+            log.info("Product {} marked as DISCONTINUED", id);
+        }
     }
 
     @Override
@@ -157,6 +185,10 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
         product.setStock(product.getStock() + quantity);
+        // Decrement soldCount when stock is restored (order cancelled)
+        if (product.getSoldCount() != null && product.getSoldCount() >= quantity) {
+            product.setSoldCount(product.getSoldCount() - quantity);
+        }
         product.setUpdatedAt(LocalDateTime.now());
         productRepository.save(product);
     }
@@ -171,6 +203,8 @@ public class ProductServiceImpl implements ProductService {
         }
 
         product.setStock(product.getStock() - quantity);
+        // Increment soldCount when stock is decremented (order created)
+        product.setSoldCount((product.getSoldCount() != null ? product.getSoldCount() : 0) + quantity);
         product.setUpdatedAt(LocalDateTime.now());
         productRepository.save(product);
     }
@@ -180,11 +214,13 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Page<ProductDto> findAllDtos(Pageable pageable) {
         try {
+            // Include all products including DISCONTINUED (admin should see all)
             Page<Product> productPage = productRepository.findAll(pageable);
             List<ProductDto> dtos = productPage.getContent().stream()
                     .map(this::convertToDtoSafe)
                     .filter(dto -> dto != null)
                     .collect(Collectors.toList());
+            
             return new PageImpl<>(dtos, pageable, productPage.getTotalElements());
         } catch (Exception e) {
             log.error("Error in findAllDtos: {}", e.getMessage(), e);
@@ -216,7 +252,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Optional<ProductDto> findDtoById(Long id) {
         return productRepository.findById(id)
-                .map(this::convertToDto);
+                .map(this::convertToDtoSafe);
     }
 
     @Override
@@ -326,7 +362,8 @@ public class ProductServiceImpl implements ProductService {
         }
         
         Product savedProduct = save(product);
-        return convertToDto(savedProduct);
+        // Use convertToDtoSafe to avoid lazy loading issues with Category.products
+        return convertToDtoSafe(savedProduct);
     }
 
     @Override
@@ -358,27 +395,34 @@ public class ProductServiceImpl implements ProductService {
 
         // Update categories if provided
         if (productDto.getCategoryIds() != null && !productDto.getCategoryIds().isEmpty()) {
-            Set<com.second_project.ecommerce.entity.Category> categories = productDto.getCategoryIds().stream()
+            // Load categories into a list first to avoid ConcurrentModificationException
+            // when collecting to Set (which calls hashCode that may trigger lazy loading)
+            List<com.second_project.ecommerce.entity.Category> categoryList = productDto.getCategoryIds().stream()
                     .map(categoryId -> categoryService.findById(categoryId)
                             .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId)))
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toList());
+            // Convert to Set after all categories are loaded
+            Set<com.second_project.ecommerce.entity.Category> categories = new java.util.HashSet<>(categoryList);
             product.setCategories(categories);
         }
 
         Product updatedProduct = productRepository.save(product);
-        return convertToDto(updatedProduct);
+        // Use convertToDtoSafe to avoid lazy loading issues with Category.products
+        return convertToDtoSafe(updatedProduct);
     }
 
     @Override
     public ProductDto approveProductDto(Long id) {
         Product product = approveProduct(id);
-        return convertToDto(product);
+        // Use convertToDtoSafe to avoid lazy loading issues with Category.products
+        return convertToDtoSafe(product);
     }
 
     @Override
     public ProductDto rejectProductDto(Long id, String reason) {
         Product product = rejectProduct(id, reason);
-        return convertToDto(product);
+        // Use convertToDtoSafe to avoid lazy loading issues with Category.products
+        return convertToDtoSafe(product);
     }
 
     /**
@@ -402,7 +446,22 @@ public class ProductServiceImpl implements ProductService {
             dto.setPrice(product.getPrice());
             dto.setOriginalPrice(product.getOriginalPrice());
             dto.setStock(product.getStock() != null ? product.getStock() : 0);
-            dto.setSoldCount(product.getSoldCount() != null ? product.getSoldCount() : 0);
+            // Calculate soldCount from order items if product's soldCount is 0 or null
+            Integer soldCount = product.getSoldCount() != null ? product.getSoldCount() : 0;
+            if (soldCount == 0 && product.getId() != null) {
+                try {
+                    Integer calculatedSoldCount = orderItemRepository.sumQuantityByProductId(product.getId());
+                    if (calculatedSoldCount != null && calculatedSoldCount > 0) {
+                        soldCount = calculatedSoldCount;
+                        // Update the product's soldCount for future queries
+                        product.setSoldCount(calculatedSoldCount);
+                        productRepository.save(product);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to calculate soldCount from order items for product {}: {}", product.getId(), e.getMessage());
+                }
+            }
+            dto.setSoldCount(soldCount);
             dto.setImages(product.getImages() != null ? product.getImages() : new java.util.ArrayList<>());
             dto.setIsFeatured(product.getIsFeatured() != null ? product.getIsFeatured() : false);
             dto.setIsHot(product.getIsHot() != null ? product.getIsHot() : false);
@@ -438,6 +497,7 @@ public class ProductServiceImpl implements ProductService {
                 try {
                     List<Long> categoryIds = productRepository.findCategoryIdsByProductId(productId);
                     if (categoryIds != null && !categoryIds.isEmpty()) {
+                        // Create a new HashSet to avoid any concurrent modification issues during serialization
                         dto.setCategoryIds(new java.util.HashSet<>(categoryIds));
                     }
                 } catch (Exception e) {
@@ -512,11 +572,16 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // Set category IDs (flatten lazy-loaded relationship)
+        // NOTE: This method is deprecated in favor of convertToDtoSafe, but kept for backward compatibility
         try {
             if (product.getCategories() != null && !product.getCategories().isEmpty()) {
-                Set<Long> categoryIds = product.getCategories().stream()
+                // Create a new HashSet to avoid any concurrent modification issues during serialization
+                // Copy to ArrayList first to avoid concurrent modification during stream processing
+                java.util.List<com.second_project.ecommerce.entity.Category> categoryList = 
+                    new java.util.ArrayList<>(product.getCategories());
+                Set<Long> categoryIds = categoryList.stream()
                         .map(com.second_project.ecommerce.entity.Category::getId)
-                        .collect(Collectors.toSet());
+                        .collect(Collectors.toCollection(java.util.HashSet::new));
                 dto.setCategoryIds(categoryIds);
             }
         } catch (Exception e) {
@@ -564,10 +629,14 @@ public class ProductServiceImpl implements ProductService {
 
         // Set categories if provided
         if (dto.getCategoryIds() != null && !dto.getCategoryIds().isEmpty()) {
-            Set<com.second_project.ecommerce.entity.Category> categories = dto.getCategoryIds().stream()
+            // Load categories into a list first to avoid ConcurrentModificationException
+            // when collecting to Set (which calls hashCode that may trigger lazy loading)
+            List<com.second_project.ecommerce.entity.Category> categoryList = dto.getCategoryIds().stream()
                     .map(categoryId -> categoryService.findById(categoryId)
                             .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId)))
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toList());
+            // Convert to Set after all categories are loaded
+            Set<com.second_project.ecommerce.entity.Category> categories = new java.util.HashSet<>(categoryList);
             product.setCategories(categories);
         }
 

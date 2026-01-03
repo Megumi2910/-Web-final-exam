@@ -99,6 +99,7 @@ const SellerProducts = () => {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   // Form state
@@ -222,19 +223,70 @@ const SellerProducts = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement API call to create product
-    console.log('Submitting product:', formData);
-    // Reset form
-    setFormData({
-      name: '',
-      price: '',
-      stock: '',
-      category: '',
-      description: '',
-      images: []
-    });
-    setImageUrl('');
-    setShowAddModal(false);
+    
+    // Validate required fields
+    if (!formData.name || !formData.price || !formData.stock || !formData.category) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
+    }
+
+    // Validate at least one image
+    if (!formData.images || formData.images.length === 0) {
+      alert('Vui lòng thêm ít nhất một hình ảnh');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Generate slug from name (simple version - backend can also handle this)
+      const generateSlug = (name) => {
+        return name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      };
+
+      // Prepare data for API
+      const productData = {
+        name: formData.name.trim(),
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock),
+        description: formData.description.trim() || null,
+        images: formData.images,
+        slug: generateSlug(formData.name),
+        categoryIds: formData.category ? [parseInt(formData.category)] : []
+      };
+
+      const response = await sellerApi.createProduct(productData);
+      
+      if (response.data.success) {
+        alert('Sản phẩm đã được tạo thành công! Đang chờ phê duyệt từ quản trị viên.');
+        // Reset form
+        setFormData({
+          name: '',
+          price: '',
+          stock: '',
+          category: '',
+          description: '',
+          images: []
+        });
+        setImageUrl('');
+        setShowAddModal(false);
+        // Refresh product list
+        await fetchProducts();
+      } else {
+        alert('Không thể tạo sản phẩm: ' + (response.data.message || 'Lỗi không xác định'));
+      }
+    } catch (error) {
+      console.error('Error creating product:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể tạo sản phẩm. Vui lòng thử lại.';
+      alert('Lỗi: ' + errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -552,15 +604,16 @@ const SellerProducts = () => {
                   type="button"
                   onClick={handleCloseModal}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={submitting}
                 >
                   Hủy
                 </button>
                 <button 
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  disabled={formData.images.length === 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={formData.images.length === 0 || submitting}
                 >
-                  Thêm sản phẩm
+                  {submitting ? 'Đang thêm...' : 'Thêm sản phẩm'}
                 </button>
               </div>
             </form>

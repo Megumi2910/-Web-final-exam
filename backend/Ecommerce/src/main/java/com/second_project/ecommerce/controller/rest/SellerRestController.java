@@ -24,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/seller")
-@PreAuthorize("hasRole('SELLER')")
+@PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
 @RequiredArgsConstructor
 @Slf4j
 public class SellerRestController {
@@ -79,6 +80,7 @@ public class SellerRestController {
     }
 
     @PostMapping("/products")
+    @Transactional
     public ResponseEntity<ApiResponse<ProductDto>> createProduct(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody ProductDto productDto) {
@@ -86,23 +88,18 @@ public class SellerRestController {
         User seller = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Check if seller is approved
-        if (!seller.getIsSellerApproved()) {
-            throw new IllegalArgumentException("Seller is not approved");
+        // Check if seller is approved (admins can bypass this check)
+        if (!seller.getRole().equals(User.UserRole.ADMIN) && !seller.getIsSellerApproved()) {
+            throw new IllegalArgumentException("Seller is not approved. Please wait for admin approval.");
         }
 
         // Set seller ID in DTO
         productDto.setSellerId(seller.getId());
         
-        // Convert DTO to entity, set seller, then save
-        Product product = convertDtoToEntity(productDto);
-        product.setSeller(seller);
-        Product savedProduct = productService.save(product);
+        // Use service layer's saveDto which handles lazy loading properly
+        ProductDto savedDto = productService.saveDto(productDto);
         
-        log.info("Product created by seller {}: {}", seller.getUserId(), savedProduct.getProductId());
-
-        ProductDto savedDto = productService.findDtoById(savedProduct.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        log.info("Product created by seller {}: {}", seller.getUserId(), savedDto.getId());
         
         return ResponseEntity.ok(ApiResponse.success("Product created successfully. Awaiting admin approval.", savedDto));
     }
@@ -155,10 +152,14 @@ public class SellerRestController {
         
         // Set categories if provided
         if (dto.getCategoryIds() != null && !dto.getCategoryIds().isEmpty()) {
-            java.util.Set<Category> categories = dto.getCategoryIds().stream()
+            // Load categories into a list first to avoid ConcurrentModificationException
+            // when collecting to Set (which calls hashCode that may trigger lazy loading)
+            java.util.List<Category> categoryList = dto.getCategoryIds().stream()
                     .map(categoryId -> categoryService.findById(categoryId)
                             .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId)))
-                    .collect(java.util.stream.Collectors.toSet());
+                    .collect(java.util.stream.Collectors.toList());
+            // Convert to Set after all categories are loaded
+            java.util.Set<Category> categories = new java.util.HashSet<>(categoryList);
             product.setCategories(categories);
         }
         

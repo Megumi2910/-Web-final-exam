@@ -74,5 +74,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     @Query("SELECT p FROM Product p WHERE p.seller.userId = :sellerId ORDER BY p.soldCount DESC")
     Page<Product> findTopSellingProductsBySellerId(@Param("sellerId") Long sellerId, Pageable pageable);
+    
+    // Find all products excluding DISCONTINUED status (for admin listing)
+    @Query("SELECT p FROM Product p WHERE p.status != :discontinuedStatus")
+    Page<Product> findAllExcludingDiscontinued(@Param("discontinuedStatus") ProductStatus discontinuedStatus, Pageable pageable);
+    
+    // Count products excluding DISCONTINUED status
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.status != :discontinuedStatus")
+    long countExcludingDiscontinued(@Param("discontinuedStatus") ProductStatus discontinuedStatus);
 }
 

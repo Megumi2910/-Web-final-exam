@@ -26,5 +26,15 @@ export const sellerApi = {
   updateProfile: (data) => {
     return api.put('/seller/profile', data);
   },
+
+  // Create product
+  createProduct: (data) => {
+    return api.post('/seller/products', data);
+  },
+
+  // Update product
+  updateProduct: (id, data) => {
+    return api.put(`/seller/products/${id}`, data);
+  },
 };
 

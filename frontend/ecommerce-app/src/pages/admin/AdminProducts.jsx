@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Plus, 
   Search, 
   Filter, 
   Edit, 
@@ -12,10 +11,12 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Store
+  Store,
+  ChevronDown
 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { productApi } from '../../services/productApi';
+import { useAuth } from '../../context/AuthContext';
 import ProductForm from '../../components/admin/ProductForm';
 
 const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject }) => {
@@ -24,6 +25,7 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
       case 'APPROVED': return 'Đã duyệt';
       case 'PENDING': return 'Chờ duyệt';
       case 'REJECTED': return 'Đã từ chối';
+      case 'DISCONTINUED': return 'Ngừng bán';
       default: return status;
     }
   };
@@ -33,6 +35,7 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
       case 'APPROVED': return 'bg-green-100 text-green-800';
       case 'PENDING': return 'bg-yellow-100 text-yellow-800';
       case 'REJECTED': return 'bg-red-100 text-red-800';
+      case 'DISCONTINUED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -41,9 +44,16 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-            {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded-lg" />
+          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+            {product.images && product.images.length > 0 && product.images[0] ? (
+              <img 
+                src={product.images[0]} 
+                alt={product.name} 
+                className="w-12 h-12 object-cover rounded-lg" 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
             ) : (
               <Package className="w-6 h-6 text-gray-400" />
             )}
@@ -119,6 +129,12 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
             <span className="text-sm font-medium text-gray-900">{product.sellerName}</span>
           </div>
         )}
+        {product.soldCount !== undefined && product.soldCount !== null && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Đã bán:</span>
+            <span className="text-sm font-medium text-gray-900">{product.soldCount || 0} sản phẩm</span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Trạng thái:</span>
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(product.status)}`}>
@@ -131,6 +147,7 @@ const ProductCard = ({ product, onEdit, onDelete, onView, onApprove, onReject })
 };
 
 const AdminProducts = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedSellerId, setSelectedSellerId] = useState(null); // null = all shops
@@ -141,6 +158,7 @@ const AdminProducts = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [showSellerDropdown, setShowSellerDropdown] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -171,9 +189,23 @@ const AdminProducts = () => {
     }
   };
 
-  // Extract unique shops from products
+  // Extract unique shops from products, including admin if they have storeName
   const shops = useMemo(() => {
     const shopMap = new Map();
+    
+    // Add admin's store if they have storeName set (show even with 0 products)
+    if (user && user.storeName && user.userId && user.storeName.trim()) {
+      // Count admin's products
+      const adminProductCount = products.filter(p => p.sellerId === user.userId).length;
+      shopMap.set(user.userId, {
+        id: user.userId,
+        name: user.storeName,
+        email: user.email,
+        productCount: adminProductCount
+      });
+    }
+    
+    // Add shops from products
     products.forEach(product => {
       if (product.sellerId && product.sellerName) {
         if (!shopMap.has(product.sellerId)) {
@@ -187,8 +219,9 @@ const AdminProducts = () => {
         shopMap.get(product.sellerId).productCount++;
       }
     });
+    
     return Array.from(shopMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [products]);
+  }, [products, user]);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -228,19 +261,22 @@ const AdminProducts = () => {
   };
 
   const handleDelete = async (product) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${product.name}"?`)) {
+    if (window.confirm(`Bạn có chắc chắn muốn ngừng bán sản phẩm "${product.name}"?\n\nSản phẩm sẽ được đánh dấu là "Ngừng bán" và sẽ không hiển thị cho khách hàng nữa. Các đơn hàng liên quan sẽ được giữ lại để lưu trữ.`)) {
       try {
         await productApi.deleteProduct(product.id);
+        alert('Sản phẩm đã được đánh dấu là "Ngừng bán" thành công.');
         fetchProducts();
       } catch (err) {
         console.error('Failed to delete product:', err);
-        alert('Không thể xóa sản phẩm');
+        const errorMessage = err.response?.data?.message || err.message || 'Không thể ngừng bán sản phẩm';
+        alert(`Không thể ngừng bán sản phẩm: ${errorMessage}`);
       }
     }
   };
 
   const handleView = (product) => {
-    console.log('View product:', product);
+    // Navigate to product detail page or show in modal
+    window.open(`/products/${product.slug || product.id}`, '_blank');
   };
 
   const handleApprove = async (product) => {
@@ -333,13 +369,6 @@ const AdminProducts = () => {
                 : 'Quản lý danh sách sản phẩm trong cửa hàng'}
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm sản phẩm</span>
-          </button>
         </div>
 
       {/* Stats */}
@@ -398,6 +427,72 @@ const AdminProducts = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            {/* Seller Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSellerDropdown(!showSellerDropdown)}
+                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2 min-w-[180px] justify-between"
+              >
+                <span className="flex items-center space-x-2">
+                  <Store className="w-4 h-4" />
+                  <span>
+                    {selectedSellerId === null 
+                      ? 'Tất cả cửa hàng' 
+                      : shops.find(s => s.id === selectedSellerId)?.name || 'Chọn cửa hàng'}
+                  </span>
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {showSellerDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowSellerDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-20 max-h-64 overflow-y-auto">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setSelectedSellerId(null);
+                          setShowSellerDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          selectedSellerId === null
+                            ? 'bg-orange-50 text-orange-600 font-medium'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Tất cả cửa hàng
+                      </button>
+                      {shops.map(shop => (
+                        <button
+                          key={shop.id}
+                          onClick={() => {
+                            setSelectedSellerId(shop.id);
+                            setShowSellerDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm ${
+                            selectedSellerId === shop.id
+                              ? 'bg-orange-50 text-orange-600 font-medium'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{shop.name}</div>
+                              {shop.email && (
+                                <div className="text-xs text-gray-500 truncate">{shop.email}</div>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500 ml-2">({shop.productCount})</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
