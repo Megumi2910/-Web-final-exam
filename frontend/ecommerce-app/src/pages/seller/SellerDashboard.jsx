@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
   ShoppingCart, 
@@ -183,6 +184,7 @@ const StorePerformance = ({ averageRating = 0, completionRate = 0 }) => {
 
 const SellerDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -203,18 +205,22 @@ const SellerDashboard = () => {
     try {
       setLoading(true);
       const response = await sellerApi.getStatistics();
+      console.log('Seller statistics response:', response.data);
       if (response.data.success) {
         const data = response.data.data;
+        console.log('Seller statistics data:', data);
         setStats({
           totalProducts: data.totalProducts || 0,
           totalOrders: data.totalOrders || 0,
           totalCustomers: data.totalCustomers || 0,
           averageRating: data.averageRating || 0,
-          monthlyRevenue: data.monthlyRevenue || 0,
+          monthlyRevenue: data.monthlyRevenue ? parseFloat(data.monthlyRevenue.toString()) : 0,
           completionRate: data.completionRate || 0,
           recentOrders: data.recentOrders || [],
           topProducts: data.topProducts || []
         });
+      } else {
+        console.error('Statistics API returned success=false:', response.data);
       }
     } catch (error) {
       console.error('Failed to fetch seller statistics:', error);
@@ -303,7 +309,10 @@ const SellerDashboard = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Thao tác nhanh</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={() => navigate('/seller/products')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          >
             <Package className="w-8 h-8 text-blue-500 mr-3" />
             <div className="text-left">
               <p className="font-medium text-gray-900">Thêm sản phẩm</p>
@@ -311,7 +320,10 @@ const SellerDashboard = () => {
             </div>
           </button>
           
-          <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={() => navigate('/seller/orders')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          >
             <ShoppingCart className="w-8 h-8 text-green-500 mr-3" />
             <div className="text-left">
               <p className="font-medium text-gray-900">Xem đơn hàng</p>
@@ -319,7 +331,10 @@ const SellerDashboard = () => {
             </div>
           </button>
           
-          <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={() => navigate('/seller/analytics')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          >
             <BarChart3 className="w-8 h-8 text-purple-500 mr-3" />
             <div className="text-left">
               <p className="font-medium text-gray-900">Xem thống kê</p>

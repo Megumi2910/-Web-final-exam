@@ -191,25 +191,25 @@ const AdminLayout = () => {
                     {user?.firstName && user?.lastName 
                       ? `${user.firstName} ${user.lastName}` 
                       : 'Tài khoản'}
-                  </span>
+                    </span>
                   <ChevronDown className="w-4 h-4" />
                 </button>
 
                 {showProfileMenu && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    <Link
+                        <Link
                       to="/admin/settings#profile"
                       className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                      onClick={() => setShowProfileMenu(false)}
-                    >
+                          onClick={() => setShowProfileMenu(false)}
+                        >
                       <User className="w-4 h-4" />
                       <span className="text-sm">Tài khoản của tôi</span>
-                    </Link>
-                    <Link
-                      to="/admin/settings"
+                        </Link>
+                        <Link
+                          to="/admin/settings"
                       className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                      onClick={() => setShowProfileMenu(false)}
-                    >
+                          onClick={() => setShowProfileMenu(false)}
+                        >
                       <Settings className="w-4 h-4" />
                       <span className="text-sm">Cài đặt</span>
                     </Link>
@@ -265,7 +265,7 @@ const AdminLayout = () => {
                                 >
                                   <Store className="w-4 h-4" />
                                   <span>Tất cả cửa hàng</span>
-                                </Link>
+                        </Link>
                               </>
                             )}
                           </div>
@@ -273,18 +273,18 @@ const AdminLayout = () => {
                       </div>
                     )}
                     <div className="border-t border-gray-200 my-2"></div>
-                    <button
+                        <button
                       className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors w-full text-left"
-                      onClick={async () => {
-                        setShowProfileMenu(false);
-                        await logout();
-                        navigate('/');
-                      }}
-                    >
+                          onClick={async () => {
+                            setShowProfileMenu(false);
+                            await logout();
+                            navigate('/');
+                          }}
+                        >
                       <X className="w-4 h-4" />
                       <span className="text-sm">Đăng xuất</span>
-                    </button>
-                  </div>
+                        </button>
+                      </div>
                 )}
               </div>
             </div>

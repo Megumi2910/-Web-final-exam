@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -10,13 +11,49 @@ import {
   Star,
   TrendingUp,
   AlertCircle,
-  Upload,
-  Image
+  Upload
 } from 'lucide-react';
 import { categoryApi } from '../../services/categoryApi';
 import { sellerApi } from '../../services/sellerApi';
 
 const ProductCard = ({ product, onEdit, onDelete, onView }) => {
+  const getStatusText = (status) => {
+    if (typeof status === 'string') {
+      switch (status.toUpperCase()) {
+        case 'APPROVED': return 'Đã duyệt';
+        case 'PENDING': return 'Chờ duyệt';
+        case 'REJECTED': return 'Đã từ chối';
+        case 'DISCONTINUED': return 'Ngừng bán';
+        case 'OUT_OF_STOCK': return 'Hết hàng';
+        case 'ACTIVE': return 'Hoạt động';
+        default: return status;
+      }
+    }
+    // Fallback for old status format
+    return status === 'active' ? 'Hoạt động' : 'Tạm dừng';
+  };
+
+  const getStatusColor = (status) => {
+    if (typeof status === 'string') {
+      switch (status.toUpperCase()) {
+        case 'APPROVED': return 'bg-green-100 text-green-800';
+        case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+        case 'REJECTED': return 'bg-red-100 text-red-800';
+        case 'DISCONTINUED': return 'bg-red-100 text-red-800';
+        case 'OUT_OF_STOCK': return 'bg-orange-100 text-orange-800';
+        case 'ACTIVE': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    }
+    // Fallback for old status format
+    return status === 'active' 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
+  };
+
+  // Use product.status directly if available, otherwise use mapped status
+  const displayStatus = product.originalStatus || product.status || 'PENDING';
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
@@ -79,12 +116,8 @@ const ProductCard = ({ product, onEdit, onDelete, onView }) => {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Trạng thái:</span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-            product.status === 'active' 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {product.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(displayStatus)}`}>
+            {getStatusText(displayStatus)}
           </span>
         </div>
       </div>
@@ -93,9 +126,11 @@ const ProductCard = ({ product, onEdit, onDelete, onView }) => {
 };
 
 const SellerProducts = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +144,8 @@ const SellerProducts = () => {
     stock: '',
     category: '',
     description: '',
-    images: []
+    images: [],
+    status: 'PENDING' // Default status for new products
   });
   const [imageUrl, setImageUrl] = useState('');
   const [categories, setCategories] = useState([]);
@@ -143,8 +179,15 @@ const SellerProducts = () => {
           images: product.images || [],
           image: product.images?.[0] || product.imageUrl || '',
           status: product.status === 'APPROVED' ? 'active' : 'inactive',
+          originalStatus: product.status, // Preserve original status for display
           rating: product.rating || 0,
-          sold: product.soldCount || 0
+          sold: product.soldCount || 0,
+          slug: product.slug || product.id?.toString() || '',
+          brand: product.brand || '',
+          sku: product.sku || '',
+          originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
+          isFeatured: product.isFeatured || false,
+          categoryIds: product.categoryIds ? (Array.isArray(product.categoryIds) ? product.categoryIds : Array.from(product.categoryIds)) : (product.categories ? product.categories.map(c => c.id || c) : [])
         }));
         setProducts(mappedProducts);
       } else {
@@ -178,22 +221,48 @@ const SellerProducts = () => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          product.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || product.status === filterStatus;
+    
+    // Use originalStatus if available, otherwise fall back to status
+    const productStatus = product.originalStatus || product.status;
+    
+    let matchesStatus = true;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'active') {
+        matchesStatus = productStatus === 'APPROVED';
+      } else if (filterStatus === 'inactive') {
+        matchesStatus = productStatus !== 'APPROVED' && productStatus !== 'DISCONTINUED';
+      } else if (filterStatus === 'discontinued') {
+        matchesStatus = productStatus === 'DISCONTINUED';
+      } else {
+        matchesStatus = product.status === filterStatus;
+      }
+    }
+    
     return matchesSearch && matchesStatus;
   });
 
   const handleEdit = (product) => {
-    console.log('Edit product:', product);
+    // Set editing product and open modal
+    setEditingProduct(product);
+    setShowAddModal(true);
   };
 
-  const handleDelete = (product) => {
+  const handleDelete = async (product) => {
     if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${product.name}"?`)) {
-      console.log('Delete product:', product);
+      try {
+        await sellerApi.deleteProduct(product.id);
+        alert('Sản phẩm đã được xóa thành công');
+        fetchProducts();
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert('Không thể xóa sản phẩm: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
   const handleView = (product) => {
-    console.log('View product:', product);
+    // Navigate to product detail page using product ID
+    window.open(`/product/${product.id}`, '_blank');
   };
 
   const handleAddImage = () => {
@@ -256,14 +325,28 @@ const SellerProducts = () => {
         stock: parseInt(formData.stock),
         description: formData.description.trim() || null,
         images: formData.images,
-        slug: generateSlug(formData.name),
+        slug: editingProduct ? editingProduct.slug : generateSlug(formData.name),
         categoryIds: formData.category ? [parseInt(formData.category)] : []
       };
 
-      const response = await sellerApi.createProduct(productData);
+      // Include status when editing (sellers can change status between APPROVED, OUT_OF_STOCK, DISCONTINUED)
+      if (editingProduct && formData.status) {
+        productData.status = formData.status;
+      }
+
+      let response;
+      if (editingProduct) {
+        // Update existing product
+        response = await sellerApi.updateProduct(editingProduct.id, productData);
+      } else {
+        // Create new product
+        response = await sellerApi.createProduct(productData);
+      }
       
       if (response.data.success) {
-        alert('Sản phẩm đã được tạo thành công! Đang chờ phê duyệt từ quản trị viên.');
+        alert(editingProduct 
+          ? 'Sản phẩm đã được cập nhật thành công!' 
+          : 'Sản phẩm đã được tạo thành công! Đang chờ phê duyệt từ quản trị viên.');
         // Reset form
         setFormData({
           name: '',
@@ -271,14 +354,16 @@ const SellerProducts = () => {
           stock: '',
           category: '',
           description: '',
-          images: []
+          images: [],
+          status: 'PENDING'
         });
         setImageUrl('');
+        setEditingProduct(null);
         setShowAddModal(false);
         // Refresh product list
         await fetchProducts();
       } else {
-        alert('Không thể tạo sản phẩm: ' + (response.data.message || 'Lỗi không xác định'));
+        alert('Không thể ' + (editingProduct ? 'cập nhật' : 'tạo') + ' sản phẩm: ' + (response.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error creating product:', error);
@@ -291,6 +376,7 @@ const SellerProducts = () => {
 
   const handleCloseModal = () => {
     setShowAddModal(false);
+    setEditingProduct(null);
     setFormData({
       name: '',
       price: '',
@@ -301,6 +387,34 @@ const SellerProducts = () => {
     });
     setImageUrl('');
   };
+
+  // Update form when editing product
+  useEffect(() => {
+    if (editingProduct && showAddModal) {
+      setFormData({
+        name: editingProduct.name || '',
+        price: editingProduct.price ? editingProduct.price.toString() : '',
+        stock: editingProduct.stock ? editingProduct.stock.toString() : '',
+        category: editingProduct.categoryIds?.[0]?.toString() || editingProduct.categories?.[0]?.id?.toString() || '',
+        description: editingProduct.description || '',
+        images: editingProduct.images || [],
+        status: editingProduct.originalStatus || editingProduct.status || 'PENDING'
+      });
+    } else if (!editingProduct && showAddModal) {
+      // Reset form for new product
+      setFormData({
+        name: '',
+        price: '',
+        stock: '',
+        category: '',
+        description: '',
+        images: [],
+        status: 'PENDING' // New products always start as PENDING
+      });
+      setImageUrl('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddModal]);
 
   const stats = {
     total: products.length,
@@ -398,8 +512,9 @@ const SellerProducts = () => {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Tạm dừng</option>
+              <option value="active">Đã duyệt</option>
+              <option value="inactive">Chờ duyệt/Từ chối</option>
+              <option value="discontinued">Ngừng bán</option>
             </select>
             <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2">
               <Filter className="w-4 h-4" />
@@ -452,7 +567,9 @@ const SellerProducts = () => {
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Thêm sản phẩm mới</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
+            </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -598,6 +715,35 @@ const SellerProducts = () => {
                   )}
                 </div>
               </div>
+
+              {/* Status field - only show when editing */}
+              {editingProduct && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Trạng thái
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={formData.status === 'PENDING' || formData.status === 'REJECTED'}
+                  >
+                    {formData.status === 'PENDING' && (
+                      <option value="PENDING">Chờ duyệt (Chỉ admin có thể thay đổi)</option>
+                    )}
+                    {formData.status === 'REJECTED' && (
+                      <option value="REJECTED">Đã từ chối (Chỉ admin có thể thay đổi)</option>
+                    )}
+                    <option value="APPROVED">Đã duyệt</option>
+                    <option value="OUT_OF_STOCK">Hết hàng</option>
+                    <option value="DISCONTINUED">Ngừng bán</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Bạn có thể thay đổi trạng thái giữa "Đã duyệt", "Hết hàng" và "Ngừng bán". Trạng thái "Chờ duyệt" và "Đã từ chối" chỉ có thể được thay đổi bởi quản trị viên.
+                  </p>
+                </div>
+              )}
             
               <div className="flex justify-end space-x-3 mt-6">
                 <button
@@ -613,7 +759,7 @@ const SellerProducts = () => {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={formData.images.length === 0 || submitting}
                 >
-                  {submitting ? 'Đang thêm...' : 'Thêm sản phẩm'}
+                  {submitting ? (editingProduct ? 'Đang cập nhật...' : 'Đang thêm...') : (editingProduct ? 'Cập nhật sản phẩm' : 'Thêm sản phẩm')}
                 </button>
               </div>
             </form>

@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clock, Flame } from 'lucide-react';
 import { ProductGrid } from '../components/product';
+import Toast from '../components/ui/Toast';
+import { cartApi } from '../services/cartApi';
+import { useAuth } from '../context/AuthContext';
 
 const FlashSalePage = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, isVerified } = useAuth();
   const [timeLeft, setTimeLeft] = useState({
     hours: 2,
     minutes: 34,
     seconds: 56
   });
   const [wishlistItems, setWishlistItems] = useState([]);
-
   const [flashSaleProducts, setFlashSaleProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     fetchFlashSaleProducts();
@@ -62,9 +69,27 @@ const FlashSalePage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    alert(`Đã thêm "${product.name}" vào giỏ hàng!`);
+  const handleAddToCart = async (product) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: '/flash-sale' } });
+      return;
+    }
+
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
+    try {
+      await cartApi.addToCart(product.id, 1);
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
   };
 
   const handleToggleWishlist = (product) => {
@@ -77,6 +102,15 @@ const FlashSalePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={2000}
+        />
+      )}
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

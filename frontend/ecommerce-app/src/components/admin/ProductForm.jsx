@@ -195,12 +195,16 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
         stock: parseInt(formData.stock) || 0,
         images: formData.images,
         isFeatured: formData.isFeatured,
-        // Don't send status in regular updates - status should only be changed via approve/reject endpoints
-        // This prevents accidental status reverts when editing other product fields
-        // status: formData.status, // Removed to prevent accidental status changes
         categories: selectedCategories.map(id => ({ id }))
       };
 
+      // Include status for both admin and seller updates
+      // Admin can change any status, sellers can change between APPROVED, OUT_OF_STOCK, and DISCONTINUED
+      if (formData.status) {
+        submitData.status = formData.status;
+      }
+
+      console.log('ProductForm - Submitting data:', submitData);
       await onSave(submitData);
       onClose();
     } catch (error) {
@@ -531,25 +535,47 @@ const ProductForm = ({ product, onClose, onSave, isAdmin = false }) => {
               Lưu ý: Sản phẩm hot được xác định tự động dựa trên số lượng bán (soldCount). Sản phẩm mới được xác định tự động dựa trên ngày tạo (trong vòng 30 ngày).
             </p>
 
-            {isAdmin && (
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Trạng thái
-                </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="PENDING">Chờ duyệt</option>
-                  <option value="APPROVED">Đã duyệt</option>
-                  <option value="REJECTED">Đã từ chối</option>
-                  <option value="OUT_OF_STOCK">Hết hàng</option>
-                  <option value="DISCONTINUED">Ngừng bán</option>
-                </select>
-              </div>
-            )}
+            {/* Status field - different options for admin vs seller */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trạng thái
+              </label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                disabled={!isAdmin && (formData.status === 'PENDING' || formData.status === 'REJECTED')}
+              >
+                {isAdmin ? (
+                  <>
+                    <option value="PENDING">Chờ duyệt</option>
+                    <option value="APPROVED">Đã duyệt</option>
+                    <option value="REJECTED">Đã từ chối</option>
+                    <option value="OUT_OF_STOCK">Hết hàng</option>
+                    <option value="DISCONTINUED">Ngừng bán</option>
+                  </>
+                ) : (
+                  <>
+                    {/* Sellers can change between these statuses */}
+                    {formData.status === 'PENDING' && (
+                      <option value="PENDING">Chờ duyệt (Chỉ admin có thể thay đổi)</option>
+                    )}
+                    {formData.status === 'REJECTED' && (
+                      <option value="REJECTED">Đã từ chối (Chỉ admin có thể thay đổi)</option>
+                    )}
+                    <option value="APPROVED">Đã duyệt</option>
+                    <option value="OUT_OF_STOCK">Hết hàng</option>
+                    <option value="DISCONTINUED">Ngừng bán</option>
+                  </>
+                )}
+              </select>
+              {!isAdmin && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Bạn có thể thay đổi trạng thái giữa "Đã duyệt", "Hết hàng" và "Ngừng bán". Trạng thái "Chờ duyệt" và "Đã từ chối" chỉ có thể được thay đổi bởi quản trị viên.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Actions */}

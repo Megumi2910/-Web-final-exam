@@ -16,7 +16,7 @@ public class ReviewDto {
 
     @Min(value = 1, message = "Rating must be at least 1")
     @Max(value = 5, message = "Rating must be at most 5")
-    private Integer rating; // Nullable for admin/seller comments
+    private Integer rating; // Required, 1-5 stars
 
     @Size(max = 2000, message = "Comment must not exceed 2000 characters")
     private String comment;
@@ -38,6 +38,8 @@ public class ReviewDto {
 
     // Permission flags
     private Boolean canEdit = false; // Can current user edit this review
+    private Integer editCount = 0; // Number of times this review has been edited
+    private Boolean hasBeenEdited = false; // Whether this review has been edited
 
     public ReviewDto() {}
 
@@ -176,6 +178,22 @@ public class ReviewDto {
 
     public void setCanEdit(Boolean canEdit) {
         this.canEdit = canEdit;
+    }
+
+    public Integer getEditCount() {
+        return editCount;
+    }
+
+    public void setEditCount(Integer editCount) {
+        this.editCount = editCount;
+    }
+
+    public Boolean getHasBeenEdited() {
+        return hasBeenEdited;
+    }
+
+    public void setHasBeenEdited(Boolean hasBeenEdited) {
+        this.hasBeenEdited = hasBeenEdited;
     }
 
     @Override

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, MessageSquare, X } from 'lucide-react';
+import { Star, ThumbsUp, MessageSquare, X, Edit2 } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +25,9 @@ const ProductReviews = ({
   const [userReview, setUserReview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [canReview, setCanReview] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editRating, setEditRating] = useState(0);
+  const [editComment, setEditComment] = useState('');
 
   // Use prop rating distribution if provided, otherwise calculate from reviews
   const ratingDistribution = Object.keys(propRatingDistribution).length > 0
@@ -85,10 +88,6 @@ const ProductReviews = ({
         return;
       }
 
-      const isAdmin = hasRole('ADMIN');
-      const isSeller = hasRole('SELLER');
-      const isCustomer = hasRole('CUSTOMER');
-
       try {
         // Check if user has already reviewed
         const hasReviewedResponse = await reviewApi.hasUserReviewedProduct(productId);
@@ -101,14 +100,8 @@ const ProductReviews = ({
           }
         }
 
-        // For customers, check if they purchased the product
-        if (isCustomer) {
-          // The backend will check this when creating review, but we can show a message
-          setCanReview(true);
-        } else if (isAdmin || isSeller) {
-          // Admin and seller can always comment
-          setCanReview(true);
-        }
+        // Only customers who purchased can review (backend will verify purchase)
+        setCanReview(true);
       } catch (err) {
         console.error('Error checking review eligibility:', err);
         setCanReview(false);
@@ -124,40 +117,23 @@ const ProductReviews = ({
       return;
     }
 
-    const isAdmin = hasRole('ADMIN');
-    const isSeller = hasRole('SELLER');
-    const isCustomer = hasRole('CUSTOMER');
-
-    // Validation
-    if (isCustomer) {
-      if (reviewRating < 1 || reviewRating > 5) {
-        alert('Vui lòng chọn đánh giá từ 1 đến 5 sao');
-        return;
-      }
-    } else if (isAdmin || isSeller) {
-      if (!reviewComment || reviewComment.trim() === '') {
-        alert('Vui lòng nhập bình luận');
-        return;
-      }
+    // Validation - rating is required
+    if (reviewRating < 1 || reviewRating > 5) {
+      alert('Vui lòng chọn đánh giá từ 1 đến 5 sao');
+      return;
     }
 
     try {
       setIsSubmitting(true);
       const reviewData = {
         productId: productId,
-        rating: isCustomer ? reviewRating : null,
+        rating: reviewRating,
         comment: reviewComment.trim() || null
       };
 
-      if (hasReviewed && userReview) {
-        // Update existing review
-        await reviewApi.updateReview(userReview.id, reviewData);
-        alert('Cập nhật đánh giá thành công!');
-      } else {
-        // Create new review
-        await reviewApi.createReview(reviewData);
-        alert('Đánh giá thành công!');
-      }
+      // Create new review
+      await reviewApi.createReview(reviewData);
+      alert('Đánh giá thành công!');
 
       // Reset form
       setReviewRating(0);
@@ -172,6 +148,52 @@ const ProductReviews = ({
     } catch (error) {
       console.error('Error submitting review:', error);
       alert(error.response?.data?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStartEdit = (review) => {
+    setEditingReviewId(review.id);
+    setEditRating(review.rating || 0);
+    setEditComment(review.comment || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReviewId(null);
+    setEditRating(0);
+    setEditComment('');
+  };
+
+  const handleSubmitEdit = async (reviewId) => {
+    if (editRating < 1 || editRating > 5) {
+      alert('Vui lòng chọn đánh giá từ 1 đến 5 sao');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const reviewData = {
+        productId: productId,
+        rating: editRating,
+        comment: editComment.trim() || null
+      };
+
+      await reviewApi.updateReview(reviewId, reviewData);
+      alert('Cập nhật đánh giá thành công!');
+
+      // Reset edit state
+      setEditingReviewId(null);
+      setEditRating(0);
+      setEditComment('');
+
+      // Refresh reviews
+      if (onReviewCreated) {
+        onReviewCreated();
+      }
+    } catch (error) {
+      console.error('Error updating review:', error);
+      alert(error.response?.data?.message || 'Không thể cập nhật đánh giá. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -288,47 +310,111 @@ const ProductReviews = ({
                         {review.userName || 'Người dùng ẩn danh'}
                       </div>
                       <div className="flex items-center space-x-2">
-                        {review.rating && (
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={clsx(
-                                  'w-4 h-4',
-                                  i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                                )}
-                              />
-                            ))}
-                          </div>
-                        )}
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={clsx(
+                                'w-4 h-4',
+                                i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                              )}
+                            />
+                          ))}
+                        </div>
                         <span className="text-sm text-gray-500">
                           {new Date(review.createdAt || review.date || review.updatedAt).toLocaleDateString('vi-VN')}
                         </span>
+                        {review.hasBeenEdited && (
+                          <span className="text-xs text-gray-400 italic">
+                            (Đã chỉnh sửa)
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {review.userRole === 'ADMIN' && (
-                        <Badge variant="primary" size="sm">
-                          Admin
-                        </Badge>
-                      )}
-                      {review.userRole === 'SELLER' && review.sellerId && review.userId === review.sellerId && (
-                        <Badge variant="primary" size="sm">
-                          Seller
-                        </Badge>
-                      )}
                       {review.isVerifiedPurchase && (
                         <Badge variant="success" size="sm">
                           Đã mua hàng
                         </Badge>
                       )}
+                      {review.canEdit && !review.hasBeenEdited && (
+                        <button
+                          onClick={() => handleStartEdit(review)}
+                          className="text-sm text-shopee-orange hover:text-orange-700 flex items-center gap-1"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Chỉnh sửa
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {(review.comment || review.content) && (
-                    <div className="text-gray-700 mb-3">
-                      {review.comment || review.content}
+                  {editingReviewId === review.id ? (
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-3 mt-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Đánh giá <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setEditRating(star)}
+                              className="focus:outline-none"
+                            >
+                              <Star
+                                className={clsx(
+                                  'w-6 h-6 transition-colors',
+                                  star <= editRating
+                                    ? 'text-yellow-400 fill-current'
+                                    : 'text-gray-300'
+                                )}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Bình luận (tùy chọn)
+                        </label>
+                        <textarea
+                          value={editComment}
+                          onChange={(e) => setEditComment(e.target.value)}
+                          placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
+                          rows={3}
+                          maxLength={2000}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent resize-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {editComment.length}/2000 ký tự
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-end space-x-3">
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          disabled={isSubmitting}
+                          size="sm"
+                        >
+                          Hủy
+                        </Button>
+                        <Button
+                          onClick={() => handleSubmitEdit(review.id)}
+                          disabled={isSubmitting || editRating === 0}
+                          size="sm"
+                        >
+                          {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+                        </Button>
+                      </div>
                     </div>
+                  ) : (
+                    (review.comment || review.content) && (
+                      <div className="text-gray-700 mb-3">
+                        {review.comment || review.content}
+                      </div>
+                    )
                   )}
 
                   {review.images && review.images.length > 0 && (
@@ -389,13 +475,13 @@ const ProductReviews = ({
               variant="outline"
             >
               <MessageSquare className="w-4 h-4 mr-2" />
-              {hasReviewed ? 'Chỉnh sửa đánh giá của bạn' : hasRole('CUSTOMER') ? 'Viết đánh giá' : 'Viết bình luận'}
+              {hasReviewed ? 'Chỉnh sửa đánh giá của bạn' : 'Viết đánh giá'}
             </Button>
           ) : (
             <div className="bg-gray-50 p-6 rounded-lg space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {hasRole('CUSTOMER') ? 'Viết đánh giá' : hasRole('ADMIN') ? 'Bình luận (Admin)' : 'Bình luận (Seller)'}
+                  Viết đánh giá
                 </h3>
                 <button
                   onClick={() => {
@@ -409,46 +495,44 @@ const ProductReviews = ({
                 </button>
               </div>
 
-              {hasRole('CUSTOMER') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Đánh giá <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setReviewRating(star)}
-                        className="focus:outline-none"
-                      >
-                        <Star
-                          className={clsx(
-                            'w-8 h-8 transition-colors',
-                            star <= reviewRating
-                              ? 'text-yellow-400 fill-current'
-                              : 'text-gray-300'
-                          )}
-                        />
-                      </button>
-                    ))}
-                    {reviewRating > 0 && (
-                      <span className="text-sm text-gray-600 ml-2">
-                        {reviewRating} sao
-                      </span>
-                    )}
-                  </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Đánh giá <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="focus:outline-none"
+                    >
+                      <Star
+                        className={clsx(
+                          'w-8 h-8 transition-colors',
+                          star <= reviewRating
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                        )}
+                      />
+                    </button>
+                  ))}
+                  {reviewRating > 0 && (
+                    <span className="text-sm text-gray-600 ml-2">
+                      {reviewRating} sao
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {hasRole('CUSTOMER') ? 'Bình luận (tùy chọn)' : 'Bình luận'} <span className="text-red-500">{hasRole('CUSTOMER') ? '' : '*'}</span>
+                  Bình luận (tùy chọn)
                 </label>
                 <textarea
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder={hasRole('CUSTOMER') ? 'Chia sẻ trải nghiệm của bạn về sản phẩm này...' : 'Nhập bình luận của bạn...'}
+                  placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
                   rows={4}
                   maxLength={2000}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:border-transparent resize-none"
@@ -458,13 +542,11 @@ const ProductReviews = ({
                 </p>
               </div>
 
-              {hasRole('CUSTOMER') && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    <strong>Lưu ý:</strong> Chỉ khách hàng đã mua sản phẩm mới có thể đánh giá. Bạn có thể để trống bình luận nếu chỉ muốn đánh giá bằng sao.
-                  </p>
-                </div>
-              )}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Lưu ý:</strong> Chỉ khách hàng đã mua sản phẩm mới có thể đánh giá. Bạn có thể để trống bình luận nếu chỉ muốn đánh giá bằng sao.
+                </p>
+              </div>
 
               <div className="flex items-center justify-end space-x-3">
                 <Button
@@ -480,9 +562,9 @@ const ProductReviews = ({
                 </Button>
                 <Button
                   onClick={handleSubmitReview}
-                  disabled={isSubmitting || (hasRole('CUSTOMER') && reviewRating === 0) || (!hasRole('CUSTOMER') && !reviewComment.trim())}
+                  disabled={isSubmitting || reviewRating === 0}
                 >
-                  {isSubmitting ? 'Đang gửi...' : hasReviewed ? 'Cập nhật' : 'Gửi đánh giá'}
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi đánh giá'}
                 </Button>
               </div>
             </div>
@@ -490,7 +572,7 @@ const ProductReviews = ({
         </div>
       )}
 
-      {isAuthenticated() && hasRole('CUSTOMER') && !hasPurchased && !hasReviewed && (
+      {isAuthenticated() && !hasReviewed && (
         <div className="border-t border-gray-200 pt-6 mt-6">
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">

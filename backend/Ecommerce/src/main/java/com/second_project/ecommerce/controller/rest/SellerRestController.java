@@ -24,7 +24,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -80,7 +79,6 @@ public class SellerRestController {
     }
 
     @PostMapping("/products")
-    @Transactional
     public ResponseEntity<ApiResponse<ProductDto>> createProduct(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody ProductDto productDto) {
@@ -93,10 +91,10 @@ public class SellerRestController {
             throw new IllegalArgumentException("Seller is not approved. Please wait for admin approval.");
         }
 
-        // Set seller ID in DTO
-        productDto.setSellerId(seller.getId());
+        // Set seller ID in DTO - use getUserId() instead of getId()
+        productDto.setSellerId(seller.getUserId());
         
-        // Use service layer's saveDto which handles lazy loading properly
+        // Use service layer's saveDto which handles lazy loading properly and has @Transactional
         ProductDto savedDto = productService.saveDto(productDto);
         
         log.info("Product created by seller {}: {}", seller.getUserId(), savedDto.getId());
@@ -190,15 +188,24 @@ public class SellerRestController {
 
     // Order Management
     @GetMapping("/orders")
-    public ResponseEntity<ApiResponse<List<Order>>> getSellerOrders(
+    public ResponseEntity<ApiResponse<List<com.second_project.ecommerce.model.OrderDto>>> getSellerOrders(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         User seller = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         List<Order> orders = orderService.findOrdersBySeller(seller);
+        
+        // Convert to DTOs to avoid lazy loading issues
+        List<com.second_project.ecommerce.model.OrderDto> orderDtos = orders.stream()
+                .map(order -> {
+                    // Use the service's convertToDto method if available, or convert manually
+                    com.second_project.ecommerce.model.OrderDto dto = orderService.getOrderDtoById(order.getId());
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
-        return ResponseEntity.ok(ApiResponse.success("Seller orders retrieved successfully", orders));
+        return ResponseEntity.ok(ApiResponse.success("Seller orders retrieved successfully", orderDtos));
     }
 
     // Store Profile
@@ -267,13 +274,22 @@ public class SellerRestController {
         BigDecimal monthlyRevenue = orderRepository.calculateMonthlyRevenueBySellerId(seller.getUserId(), startOfMonth);
         stats.setMonthlyRevenue(monthlyRevenue != null ? monthlyRevenue : BigDecimal.ZERO);
         
-        // Recent orders (last 5)
+        // Recent orders (last 5) - fetch with user to avoid lazy loading
         Page<Order> recentOrders = orderRepository.findRecentOrdersBySellerId(seller.getUserId(), PageRequest.of(0, 5));
         stats.setRecentOrders(recentOrders.getContent().stream()
                 .map(order -> {
                     SellerStatistics.OrderSummary orderSummary = new SellerStatistics.OrderSummary();
                     orderSummary.setId(order.getOrderNumber() != null ? order.getOrderNumber() : "#" + order.getId());
-                    orderSummary.setCustomerName(order.getUser().getFirstName() + " " + order.getUser().getLastName());
+                    // Access user within transaction to avoid lazy loading issues
+                    String customerName = "Khách hàng";
+                    try {
+                        if (order.getUser() != null) {
+                            customerName = order.getUser().getFirstName() + " " + order.getUser().getLastName();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not get customer name for order {}: {}", order.getId(), e.getMessage());
+                    }
+                    orderSummary.setCustomerName(customerName);
                     orderSummary.setTotal(order.getTotalAmount());
                     orderSummary.setStatus(order.getOrderStatus().name());
                     orderSummary.setTimeAgo(calculateTimeAgo(order.getOrderDate()));
@@ -286,11 +302,11 @@ public class SellerRestController {
         stats.setTopProducts(topProducts.getContent().stream()
                 .map(product -> {
                     SellerStatistics.ProductSummary productSummary = new SellerStatistics.ProductSummary();
-                    productSummary.setId(product.getProductId());
+                    productSummary.setId(product.getId());
                     productSummary.setName(product.getName());
                     productSummary.setSales(product.getSoldCount() != null ? product.getSoldCount() : 0);
                     productSummary.setPrice(product.getPrice());
-                    Double productRating = reviewRepository.getAverageRatingByProductId(product.getProductId());
+                    Double productRating = reviewRepository.getAverageRatingByProductId(product.getId());
                     productSummary.setRating(productRating != null ? productRating : 0.0);
                     return productSummary;
                 })
@@ -298,7 +314,7 @@ public class SellerRestController {
         
         // Completion rate (completed orders / total orders)
         long totalOrderCount = stats.getTotalOrders();
-        long completedCount = orderRepository.countByUserIdAndOrderStatus(seller.getUserId(), Order.OrderStatus.COMPLETED);
+        long completedCount = orderRepository.countSellerOrdersByStatus(seller.getUserId(), Order.OrderStatus.COMPLETED);
         if (totalOrderCount > 0) {
             stats.setCompletionRate((double) completedCount / totalOrderCount * 100);
         } else {

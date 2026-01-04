@@ -377,8 +377,8 @@ const Header = () => {
                                   <span>{user.storeName}</span>
                                 </Link>
                               ) : (
-                                <Link
-                                  to="/seller"
+                        <Link
+                          to="/seller"
                                   className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm"
                                   onClick={() => {
                                     setIsShopMenuOpen(false);
@@ -399,10 +399,10 @@ const Header = () => {
                                       setIsShopMenuOpen(false);
                                       setIsUserMenuOpen(false);
                                     }}
-                                  >
-                                    <Store className="w-4 h-4" />
+                        >
+                          <Store className="w-4 h-4" />
                                     <span>Tất cả cửa hàng</span>
-                                  </Link>
+                        </Link>
                                 </>
                               )}
                             </div>

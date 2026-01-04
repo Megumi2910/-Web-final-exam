@@ -64,62 +64,33 @@ public class ReviewServiceImpl implements ReviewService {
         Product product = productRepository.findById(reviewDto.getProductId())
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-        // Determine user role
-        User.UserRole userRole = user.getRole();
-        boolean isAdmin = userRole == User.UserRole.ADMIN;
-        boolean isSeller = userRole == User.UserRole.SELLER;
-        boolean isCustomer = userRole == User.UserRole.CUSTOMER;
-        
-        // Check if seller owns this product
-        boolean isProductOwner = product.getSeller() != null && 
-                                 product.getSeller().getUserId().equals(userId);
-
-        // Validation based on user role
-        if (isCustomer) {
-            // Regular customers: must have purchased the product and provide a rating
-            Boolean hasPurchased = checkIfUserPurchasedProduct(userId, reviewDto.getProductId());
-            if (!hasPurchased) {
-                throw new IllegalArgumentException("You must purchase this product before leaving a review");
-            }
-            if (reviewDto.getRating() == null || reviewDto.getRating() < 1 || reviewDto.getRating() > 5) {
-                throw new IllegalArgumentException("Rating is required and must be between 1 and 5");
-            }
-        } else if (isAdmin) {
-            // Admin: can comment without purchase, no rating required
-            if (reviewDto.getRating() != null) {
-                throw new IllegalArgumentException("Admin reviews cannot include ratings");
-            }
-            if (reviewDto.getComment() == null || reviewDto.getComment().trim().isEmpty()) {
-                throw new IllegalArgumentException("Admin reviews must include a comment");
-            }
-        } else if (isSeller) {
-            // Seller: can only comment on their own products, no rating
-            if (!isProductOwner) {
-                throw new IllegalArgumentException("Sellers can only comment on their own products");
-            }
-            if (reviewDto.getRating() != null) {
-                throw new IllegalArgumentException("Seller reviews cannot include ratings");
-            }
-            if (reviewDto.getComment() == null || reviewDto.getComment().trim().isEmpty()) {
-                throw new IllegalArgumentException("Seller reviews must include a comment");
-            }
+        // Only customers who have purchased the product can review
+        Boolean hasPurchased = checkIfUserPurchasedProduct(userId, reviewDto.getProductId());
+        if (!hasPurchased) {
+            throw new IllegalArgumentException("You must purchase this product before leaving a review");
         }
 
-        // Check if user has purchased the product (for verified purchase badge - only for customers)
-        Boolean isVerifiedPurchase = isCustomer && checkIfUserPurchasedProduct(userId, reviewDto.getProductId());
+        // Rating is required
+        if (reviewDto.getRating() == null || reviewDto.getRating() < 1 || reviewDto.getRating() > 5) {
+            throw new IllegalArgumentException("Rating is required and must be between 1 and 5");
+        }
+
+        // Check if user has purchased the product (for verified purchase badge)
+        Boolean isVerifiedPurchase = checkIfUserPurchasedProduct(userId, reviewDto.getProductId());
 
         // Create review entity
         Review review = new Review();
-        review.setRating(reviewDto.getRating()); // Can be null for admin/seller
+        review.setRating(reviewDto.getRating());
         review.setComment(reviewDto.getComment());
         review.setUser(user);
         review.setProduct(product);
         review.setIsVerifiedPurchase(isVerifiedPurchase);
+        review.setEditCount(0); // New review, not edited yet
 
         // Save review
         review = reviewRepository.save(review);
 
-        log.info("Review created successfully: {} by user {} (role: {})", review.getId(), userId, userRole);
+        log.info("Review created successfully: {} by user {}", review.getId(), userId);
 
         return convertToDto(review, userId);
     }
@@ -136,13 +107,25 @@ public class ReviewServiceImpl implements ReviewService {
             throw new IllegalArgumentException("You are not authorized to edit this review");
         }
 
+        // Check if review has already been edited (max 1 edit allowed)
+        Integer currentEditCount = review.getEditCount() != null ? review.getEditCount() : 0;
+        if (currentEditCount >= 1) {
+            throw new IllegalArgumentException("You can only edit your review once");
+        }
+
+        // Validate rating
+        if (reviewDto.getRating() == null || reviewDto.getRating() < 1 || reviewDto.getRating() > 5) {
+            throw new IllegalArgumentException("Rating is required and must be between 1 and 5");
+        }
+
         // Update review
         review.setRating(reviewDto.getRating());
         review.setComment(reviewDto.getComment());
+        review.setEditCount(currentEditCount + 1); // Increment edit count
 
         review = reviewRepository.save(review);
 
-        log.info("Review updated successfully: {}", reviewId);
+        log.info("Review updated successfully: {} by user {} (edit count: {})", reviewId, userId, review.getEditCount());
 
         return convertToDto(review, userId);
     }
@@ -296,6 +279,8 @@ public class ReviewServiceImpl implements ReviewService {
         dto.setRating(review.getRating());
         dto.setComment(review.getComment());
         dto.setIsVerifiedPurchase(review.getIsVerifiedPurchase() != null ? review.getIsVerifiedPurchase() : false);
+        dto.setEditCount(review.getEditCount() != null ? review.getEditCount() : 0);
+        dto.setHasBeenEdited(review.getEditCount() != null && review.getEditCount() > 0);
         dto.setCreatedAt(review.getCreatedAt());
         dto.setUpdatedAt(review.getUpdatedAt());
 
@@ -328,7 +313,10 @@ public class ReviewServiceImpl implements ReviewService {
         // Check if current user can edit this review
         if (currentUserId != null) {
             try {
-                dto.setCanEdit(review.getUser().getUserId().equals(currentUserId));
+                boolean isOwner = review.getUser().getUserId().equals(currentUserId);
+                // Can edit only if user owns the review AND hasn't edited it yet (max 1 edit)
+                boolean canEdit = isOwner && (review.getEditCount() == null || review.getEditCount() < 1);
+                dto.setCanEdit(canEdit);
             } catch (Exception e) {
                 log.warn("Failed to check edit permission for review {}: {}", review.getId(), e.getMessage());
             }

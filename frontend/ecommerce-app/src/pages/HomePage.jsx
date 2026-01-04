@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Star, Truck, Shield, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui';
+import Toast from '../components/ui/Toast';
 import { ProductGrid, CategoryCard } from '../components/product';
 import { categoryApi } from '../services/categoryApi';
 import { productApi } from '../services/productApi';
+import { cartApi } from '../services/cartApi';
+import { useAuth } from '../context/AuthContext';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, isVerified } = useAuth();
   const [currentBanner, setCurrentBanner] = useState(0);
   const [wishlistItems, setWishlistItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -15,6 +19,8 @@ const HomePage = () => {
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     fetchHomeData();
@@ -129,9 +135,27 @@ const HomePage = () => {
     setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length);
   };
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    // TODO: Implement add to cart logic
+  const handleAddToCart = async (product) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: '/' } });
+      return;
+    }
+
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
+    try {
+      await cartApi.addToCart(product.id, 1);
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
   };
 
   const handleToggleWishlist = (product) => {
@@ -162,6 +186,15 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={2000}
+        />
+      )}
+
       {/* Hero Banner */}
       <section className="relative">
         <div className="relative h-96 overflow-hidden">

@@ -337,6 +337,10 @@ public class CartServiceImpl implements CartService {
                 User seller = product.getSeller();
                 dto.setSellerId(seller.getUserId());
                 dto.setSellerName(seller.getFirstName() + " " + seller.getLastName());
+                // Use storeName if available, otherwise fallback to seller name
+                dto.setStoreName(seller.getStoreName() != null && !seller.getStoreName().trim().isEmpty() 
+                    ? seller.getStoreName() 
+                    : seller.getFirstName() + " " + seller.getLastName());
             }
         }
 

@@ -16,7 +16,7 @@ import {
   Star,
   MessageSquare
 } from 'lucide-react';
-import { orderApi } from '../../services/orderApi';
+import { sellerApi } from '../../services/sellerApi';
 
 const OrderCard = ({ order, onView, onEdit }) => {
   const getStatusColor = (status) => {
@@ -154,7 +154,7 @@ const SellerOrders = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await orderApi.getMyOrders(0, 100);
+        const response = await sellerApi.getMyOrders();
         
         if (response.data.success) {
           const mappedOrders = (response.data.data || []).map(order => {
@@ -181,10 +181,10 @@ const SellerOrders = () => {
 
             return {
               id: order.orderNumber || order.id?.toString() || `DH${order.id}`,
-              customer: order.user?.fullName || order.user?.email || 'Khách hàng',
-              phone: order.phoneNumber || order.shippingPhone || '',
+              customer: order.userName || order.user?.fullName || order.user?.email || 'Khách hàng',
+              phone: order.phoneNumber || order.customerPhone || order.shippingPhone || '',
               address: order.shippingAddress || '',
-              items: order.items?.length || 0,
+              items: order.items?.length || order.orderItems?.length || 0,
               total: order.totalAmount ? parseFloat(order.totalAmount) : 0,
               status: status,
               note: order.notes || null,

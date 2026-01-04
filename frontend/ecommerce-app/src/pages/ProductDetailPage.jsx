@@ -46,7 +46,8 @@ const ProductDetailPage = () => {
         discount: productData.originalPrice ? Math.round(((productData.originalPrice - productData.price) / productData.originalPrice) * 100) : 0,
         variants: productData.variants || [],
         specifications: productData.specifications || [],
-        features: productData.features || []
+        features: productData.features || [],
+        status: productData.status // Preserve status for discontinued check
       };
       
       setProduct(transformedProduct);
@@ -92,7 +93,7 @@ const ProductDetailPage = () => {
       } catch (err) {
         console.error('Failed to fetch reviews:', err);
         // Set defaults if reviews fail
-        setReviews([]);
+      setReviews([]);
         setAverageRating(0);
         setReviewCount(0);
         setRatingDistribution({});

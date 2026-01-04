@@ -32,6 +32,7 @@ public class CartItemDto {
     private Integer productStock;
     private Long sellerId;
     private String sellerName;
+    private String storeName;
     
     // Cart item specific fields
     private Integer quantity;

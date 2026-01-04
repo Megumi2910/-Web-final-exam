@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Heart, 
   ShoppingCart, 
@@ -10,15 +11,21 @@ import {
   List
 } from 'lucide-react';
 import { Button, Badge, Card } from '../../components/ui';
+import Toast from '../../components/ui/Toast';
 import { clsx } from 'clsx';
+import { cartApi } from '../../services/cartApi';
+import { useAuth } from '../../context/AuthContext';
 
 const CustomerWishlist = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, isVerified } = useAuth();
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [selectedItems, setSelectedItems] = useState([]);
-
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     fetchWishlist();
@@ -70,8 +77,27 @@ const CustomerWishlist = () => {
     setSelectedItems([]);
   };
 
-  const handleAddToCart = (item) => {
-    console.log('Adding to cart:', item);
+  const handleAddToCart = async (item) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: '/customer/wishlist' } });
+      return;
+    }
+
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
+    try {
+      await cartApi.addToCart(item.productId || item.id, 1);
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
   };
 
   const getPriceHistoryBadge = (history) => {
@@ -95,6 +121,15 @@ const CustomerWishlist = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={2000}
+        />
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Sản phẩm yêu thích</h1>

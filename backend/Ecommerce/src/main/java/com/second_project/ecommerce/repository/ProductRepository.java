@@ -29,10 +29,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     Page<Product> findByStatusAndSellerId(ProductStatus status, Long sellerId, Pageable pageable);
     
+    // Query using JPQL - more reliable with pagination
     @Query("SELECT p FROM Product p WHERE p.seller.userId = :sellerId AND p.status = :status")
     Page<Product> findBySellerIdAndStatus(@Param("sellerId") Long sellerId, 
                                           @Param("status") ProductStatus status, 
                                           Pageable pageable);
+    
+    // Alternative query using native query to check seller_id foreign key directly (for debugging)
+    @Query(value = "SELECT * FROM products WHERE seller_id = :sellerId AND status = :status", nativeQuery = true)
+    List<Object[]> findBySellerIdAndStatusNativeRaw(@Param("sellerId") Long sellerId, @Param("status") String status);
+    
+    // Query to find products by seller ID excluding DISCONTINUED
+    @Query("SELECT p FROM Product p WHERE p.seller.userId = :sellerId AND p.status != 'DISCONTINUED'")
+    Page<Product> findBySellerIdExcludingDiscontinued(@Param("sellerId") Long sellerId, Pageable pageable);
     
     Page<Product> findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(
         String name, String brand, Pageable pageable);

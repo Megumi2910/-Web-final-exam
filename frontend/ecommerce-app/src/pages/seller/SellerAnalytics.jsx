@@ -15,6 +15,7 @@ import {
   Award,
   Activity
 } from 'lucide-react';
+import { sellerApi } from '../../services/sellerApi';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color = "blue" }) => {
   const colorClasses = {
@@ -81,12 +82,71 @@ const SellerAnalytics = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // TODO: Implement analytics API call
-      // const response = await sellerApi.getAnalytics(timeRange);
-      // if (response.data.success) {
-      //   setAnalytics(response.data.data);
-      // }
-      // For now, set empty data
+      const response = await sellerApi.getStatistics();
+      console.log('Analytics statistics response:', response.data);
+      if (response.data.success) {
+        const data = response.data.data;
+        
+        // Format monthly revenue
+        const monthlyRevenue = data.monthlyRevenue ? parseFloat(data.monthlyRevenue.toString()) : 0;
+        const revenueValue = monthlyRevenue > 0 ? monthlyRevenue.toLocaleString('vi-VN') + '₫' : '0₫';
+        
+        // Format orders
+        const ordersValue = (data.totalOrders || 0).toString();
+        
+        // Format customers
+        const customersValue = (data.totalCustomers || 0).toString();
+        
+        // Format conversion rate (completion rate)
+        const conversionRate = data.completionRate ? parseFloat(data.completionRate.toString()).toFixed(1) : '0';
+        
+        // Map top products
+        const topProducts = (data.topProducts || []).map((product, index) => {
+          const price = product.price ? parseFloat(product.price.toString()) : 0;
+          const sales = product.sales || 0;
+          const revenue = price * sales;
+          return {
+            id: product.id,
+            name: product.name,
+            sales: sales,
+            revenue: revenue > 0 ? revenue.toLocaleString('vi-VN') : '0',
+            growth: '+0%', // Placeholder for growth percentage
+            rating: product.rating ? parseFloat(product.rating.toString()).toFixed(1) : '0.0'
+          };
+        });
+        
+        // Map order statuses (we'll need to calculate from orders if available)
+        const orderStatuses = [];
+        
+        setAnalytics({
+          revenue: { value: revenueValue, change: '0%', changeType: 'up' },
+          orders: { value: ordersValue, change: '0%', changeType: 'up' },
+          newCustomers: { value: customersValue, change: '0%', changeType: 'up' },
+          conversionRate: { value: `${conversionRate}%`, change: '0%', changeType: 'up' },
+          topProducts: topProducts,
+          customerInsights: [],
+          performanceMetrics: [],
+          orderStatuses: orderStatuses,
+          searchTrends: []
+        });
+      } else {
+        console.error('Statistics API returned success=false:', response.data);
+        // Set empty data on error
+        setAnalytics({
+          revenue: { value: '0', change: '0%', changeType: 'up' },
+          orders: { value: '0', change: '0%', changeType: 'up' },
+          newCustomers: { value: '0', change: '0%', changeType: 'up' },
+          conversionRate: { value: '0%', change: '0%', changeType: 'up' },
+          topProducts: [],
+          customerInsights: [],
+          performanceMetrics: [],
+          orderStatuses: [],
+          searchTrends: []
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      // Set empty data on error
       setAnalytics({
         revenue: { value: '0', change: '0%', changeType: 'up' },
         orders: { value: '0', change: '0%', changeType: 'up' },
@@ -98,8 +158,6 @@ const SellerAnalytics = () => {
         orderStatuses: [],
         searchTrends: []
       });
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
     } finally {
       setLoading(false);
     }

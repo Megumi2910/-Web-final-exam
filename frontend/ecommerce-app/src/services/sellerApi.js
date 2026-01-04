@@ -7,9 +7,8 @@ export const sellerApi = {
   },
 
   // Get seller's orders
-  getMyOrders: (page = 0, size = 10) => {
-    // Note: This endpoint may need to be created in backend
-    return api.get(`/orders/seller/my-orders?page=${page}&size=${size}`);
+  getMyOrders: () => {
+    return api.get('/seller/orders');
   },
 
   // Get seller statistics
@@ -35,6 +34,11 @@ export const sellerApi = {
   // Update product
   updateProduct: (id, data) => {
     return api.put(`/seller/products/${id}`, data);
+  },
+
+  // Delete product
+  deleteProduct: (id) => {
+    return api.delete(`/seller/products/${id}`);
   },
 };
 

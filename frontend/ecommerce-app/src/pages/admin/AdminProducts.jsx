@@ -275,8 +275,8 @@ const AdminProducts = () => {
   };
 
   const handleView = (product) => {
-    // Navigate to product detail page or show in modal
-    window.open(`/products/${product.slug || product.id}`, '_blank');
+    // Navigate to product detail page using product ID
+    window.open(`/product/${product.id}`, '_blank');
   };
 
   const handleApprove = async (product) => {

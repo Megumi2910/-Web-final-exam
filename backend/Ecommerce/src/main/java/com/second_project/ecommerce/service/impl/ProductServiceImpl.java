@@ -335,7 +335,50 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Page<ProductDto> findBySellerIdDtos(Long sellerId, Pageable pageable) {
         // Show only APPROVED products for public shop page
+        log.debug("Fetching products for sellerId: {} with status: APPROVED", sellerId);
+        
         Page<Product> productPage = productRepository.findBySellerIdAndStatus(sellerId, Product.ProductStatus.APPROVED, pageable);
+        
+        // If no products found, check if there are any products with this sellerId but different status
+        // This helps debug the issue
+        if (productPage.getTotalElements() == 0) {
+            log.warn("No APPROVED products found for sellerId: {}. Checking all products for this seller...", sellerId);
+            
+            // Check using native query to see actual seller_id values
+            try {
+                Long productId = 2L; // The product ID from the image
+                Long actualSellerId = productRepository.findSellerIdByProductId(productId);
+                log.warn("Product ID 2 has seller_id: {}, but we're looking for sellerId: {}", actualSellerId, sellerId);
+            } catch (Exception e) {
+                log.warn("Could not check product seller_id: {}", e.getMessage());
+            }
+            
+            Page<Product> allProducts = productRepository.findBySellerIdExcludingDiscontinued(sellerId, pageable);
+            if (allProducts.getTotalElements() > 0) {
+                log.warn("Found {} products for sellerId {} but none are APPROVED. Statuses: {}", 
+                    allProducts.getTotalElements(), sellerId,
+                    allProducts.getContent().stream()
+                        .map(p -> p.getStatus().name())
+                        .collect(Collectors.toSet()));
+                
+                // Also log the product IDs and their seller IDs for debugging
+                allProducts.getContent().forEach(p -> {
+                    try {
+                        Long productSellerId = p.getSeller() != null ? p.getSeller().getUserId() : null;
+                        Long dbSellerId = productRepository.findSellerIdByProductId(p.getId());
+                        log.warn("Product ID: {}, Name: {}, Status: {}, Seller.userId: {}, DB seller_id: {}, Expected SellerId: {}", 
+                            p.getId(), p.getName(), p.getStatus(), productSellerId, dbSellerId, sellerId);
+                    } catch (Exception e) {
+                        log.warn("Could not get seller info for product {}: {}", p.getId(), e.getMessage());
+                    }
+                });
+            } else {
+                log.warn("No products found at all for sellerId: {}. Checking if seller exists...", sellerId);
+            }
+        } else {
+            log.debug("Found {} APPROVED products for sellerId: {}", productPage.getTotalElements(), sellerId);
+        }
+        
         List<ProductDto> dtos = productPage.getContent().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
@@ -353,6 +396,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ProductDto saveDto(ProductDto productDto) {
         Product product = convertToEntity(productDto);
         
@@ -364,34 +408,60 @@ public class ProductServiceImpl implements ProductService {
         }
         
         Product savedProduct = save(product);
+        productRepository.flush(); // Ensure changes are persisted before DTO conversion
         // Use convertToDtoSafe to avoid lazy loading issues with Category.products
         return convertToDtoSafe(savedProduct);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ProductDto updateDto(Long id, ProductDto productDto) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
         // Update fields
-        product.setName(productDto.getName());
-        product.setSlug(productDto.getSlug());
-        product.setDescription(productDto.getDescription());
-        product.setPrice(productDto.getPrice());
-        product.setOriginalPrice(productDto.getOriginalPrice());
-        product.setStock(productDto.getStock());
-        product.setImages(productDto.getImages());
-        product.setBrand(productDto.getBrand());
-        product.setIsFeatured(productDto.getIsFeatured());
-        product.setIsHot(productDto.getIsHot());
-        product.setIsNew(productDto.getIsNew());
-        
-        // Preserve status - only update if explicitly provided and user has permission
-        // Admin can change status, but we preserve it if not provided to prevent accidental reverts
-        if (productDto.getStatus() != null) {
-            product.setStatus(productDto.getStatus());
+        if (productDto.getName() != null) {
+            product.setName(productDto.getName());
         }
-        // If status is not provided in DTO, keep the existing status (important for approval persistence)
+        if (productDto.getSlug() != null && !productDto.getSlug().isEmpty()) {
+            product.setSlug(productDto.getSlug());
+        }
+        if (productDto.getDescription() != null) {
+            product.setDescription(productDto.getDescription());
+        }
+        if (productDto.getPrice() != null) {
+            product.setPrice(productDto.getPrice());
+        }
+        if (productDto.getOriginalPrice() != null) {
+            product.setOriginalPrice(productDto.getOriginalPrice());
+        }
+        if (productDto.getStock() != null) {
+            product.setStock(productDto.getStock());
+        }
+        if (productDto.getImages() != null) {
+            product.setImages(productDto.getImages());
+        }
+        if (productDto.getBrand() != null) {
+            product.setBrand(productDto.getBrand());
+        }
+        if (productDto.getIsFeatured() != null) {
+            product.setIsFeatured(productDto.getIsFeatured());
+        }
+        if (productDto.getIsHot() != null) {
+            product.setIsHot(productDto.getIsHot());
+        }
+        if (productDto.getIsNew() != null) {
+            product.setIsNew(productDto.getIsNew());
+        }
+        
+        // Update status if provided in DTO
+        // Admin can change status including DISCONTINUED
+        if (productDto.getStatus() != null) {
+            log.debug("Updating product {} status from {} to {}", id, product.getStatus(), productDto.getStatus());
+            product.setStatus(productDto.getStatus());
+        } else {
+            log.debug("Product {} status not provided in DTO, keeping existing status: {}", id, product.getStatus());
+        }
         
         product.setUpdatedAt(LocalDateTime.now());
 
@@ -409,7 +479,10 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Product updatedProduct = productRepository.save(product);
+        // Flush to ensure all changes are persisted before converting to DTO
+        productRepository.flush();
         // Use convertToDtoSafe to avoid lazy loading issues with Category.products
+        // All lazy-loaded relationships should be accessed within this transaction
         return convertToDtoSafe(updatedProduct);
     }
 
@@ -455,9 +528,8 @@ public class ProductServiceImpl implements ProductService {
                     Integer calculatedSoldCount = orderItemRepository.sumQuantityByProductId(product.getId());
                     if (calculatedSoldCount != null && calculatedSoldCount > 0) {
                         soldCount = calculatedSoldCount;
-                        // Update the product's soldCount for future queries
+                        // Update the product's soldCount for future queries (but don't save here to avoid nested transaction issues)
                         product.setSoldCount(calculatedSoldCount);
-                        productRepository.save(product);
                     }
                 } catch (Exception e) {
                     log.warn("Failed to calculate soldCount from order items for product {}: {}", product.getId(), e.getMessage());

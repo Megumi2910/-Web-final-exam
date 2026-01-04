@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Store, Star, Package, Users, Award, ArrowLeft } from 'lucide-react';
 import { Button, Card, Badge } from '../components/ui';
+import Toast from '../components/ui/Toast';
 import { ProductGrid } from '../components/product';
 import { productApi } from '../services/productApi';
 import { userApi } from '../services/userApi';
+import { cartApi } from '../services/cartApi';
+import { useAuth } from '../context/AuthContext';
 
 const ShopPage = () => {
   const { sellerId } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, isVerified } = useAuth();
   const [seller, setSeller] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +20,8 @@ const ShopPage = () => {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     if (sellerId) {
@@ -54,8 +60,9 @@ const ShopPage = () => {
       // Fetch seller's products
       const productsResponse = await productApi.getSellerProducts(sellerId, page, 20);
       if (productsResponse.data.success) {
-        const pageData = productsResponse.data.data;
-        const productsList = pageData.content || pageData.data || [];
+        const pageData = productsResponse.data;
+        // PageResponse returns data as an array directly, not wrapped in content
+        const productsList = Array.isArray(pageData.data) ? pageData.data : (pageData.data?.content || pageData.data?.data || []);
         
         const mappedProducts = productsList.map(product => ({
           id: product.id,
@@ -77,6 +84,13 @@ const ShopPage = () => {
         setProducts(mappedProducts);
         setTotalPages(pageData.totalPages || 1);
         setTotalProducts(pageData.totalElements || productsList.length);
+        
+        console.log('ShopPage - Products fetched:', {
+          productsListLength: productsList.length,
+          mappedProductsLength: mappedProducts.length,
+          totalElements: pageData.totalElements,
+          pageData: pageData
+        });
       } else {
         setError('Không thể tải sản phẩm của shop');
       }
@@ -88,9 +102,27 @@ const ShopPage = () => {
     }
   };
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    // TODO: Implement add to cart logic
+  const handleAddToCart = async (product) => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: `/shop/${sellerId}` } });
+      return;
+    }
+
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
+    try {
+      await cartApi.addToCart(product.id, 1);
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
   };
 
   const handleToggleWishlist = (product) => {
@@ -130,6 +162,15 @@ const ShopPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={2000}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

@@ -11,6 +11,7 @@ import {
   Star,
   Calendar
 } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color = "blue" }) => {
   const colorClasses = {
@@ -64,6 +65,9 @@ const AdminAnalytics = () => {
   });
   const [loading, setLoading] = useState(true);
   const [topProducts, setTopProducts] = useState([]);
+  const [monthlyRevenueData, setMonthlyRevenueData] = useState([]);
+  const [dailyOrdersData, setDailyOrdersData] = useState([]);
+  const [orderStatusData, setOrderStatusData] = useState([]);
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -74,7 +78,7 @@ const AdminAnalytics = () => {
       setLoading(true);
       // Fetch orders to calculate stats
       const ordersResponse = await adminApi.getAllOrders(0, 1000);
-      const orders = ordersResponse.data.data.content || [];
+      const orders = ordersResponse.data.success ? (ordersResponse.data.data || []) : [];
       
       // Calculate monthly revenue (current month)
       const now = new Date();
@@ -88,7 +92,7 @@ const AdminAnalytics = () => {
       const newOrders = currentMonthOrders.length;
 
       // Get unique customers this month
-      const newCustomers = new Set(currentMonthOrders.map(o => o.customerId)).size;
+      const newCustomers = new Set(currentMonthOrders.map(o => o.userId || o.customerId)).size;
 
       // Calculate conversion rate (simplified)
       const conversionRate = orders.length > 0 ? ((newOrders / orders.length) * 100).toFixed(1) : 0;
@@ -102,7 +106,61 @@ const AdminAnalytics = () => {
 
       // Fetch top products
       const productsResponse = await adminApi.getAllProducts(0, 5);
-      setTopProducts(productsResponse.data.data.content || []);
+      const products = productsResponse.data.success ? (productsResponse.data.data || []) : [];
+      setTopProducts(products);
+
+      // Calculate monthly revenue data (last 6 months)
+      const monthlyData = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = date.toLocaleString('vi-VN', { month: 'short' });
+        const monthOrders = orders.filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === date.getMonth() && orderDate.getFullYear() === date.getFullYear();
+        });
+        const revenue = monthOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+        monthlyData.push({
+          month: monthName,
+          revenue: revenue
+        });
+      }
+      setMonthlyRevenueData(monthlyData);
+
+      // Calculate daily orders (last 7 days)
+      const dailyData = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dayName = date.toLocaleString('vi-VN', { weekday: 'short' });
+        const dayOrders = orders.filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate.toDateString() === date.toDateString();
+        });
+        dailyData.push({
+          day: dayName,
+          orders: dayOrders.length
+        });
+      }
+      setDailyOrdersData(dailyData);
+
+      // Calculate order status distribution
+      const statusCounts = {};
+      orders.forEach(order => {
+        const status = order.orderStatus || 'PENDING';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      const statusLabels = {
+        'PENDING': 'Chờ xác nhận',
+        'CONFIRMED': 'Đã xác nhận',
+        'SHIPPING': 'Đang giao',
+        'DELIVERED': 'Đã giao',
+        'CANCELLED': 'Đã hủy'
+      };
+      const statusData = Object.entries(statusCounts).map(([status, count]) => ({
+        name: statusLabels[status] || status,
+        value: count
+      }));
+      setOrderStatusData(statusData);
     } catch (err) {
       console.error('Failed to fetch analytics data:', err);
     } finally {
@@ -164,21 +222,55 @@ const AdminAnalytics = () => {
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Doanh thu theo tháng">
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">Biểu đồ doanh thu theo tháng</p>
+          {monthlyRevenueData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={256}>
+              <BarChart data={monthlyRevenueData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [`${value.toLocaleString()}đ`, 'Doanh thu']}
+                />
+                <Legend />
+                <Bar dataKey="revenue" fill="#10b981" name="Doanh thu" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Chưa có dữ liệu</p>
+              </div>
             </div>
-          </div>
+          )}
         </ChartCard>
 
         <ChartCard title="Đơn hàng theo ngày">
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">Biểu đồ đơn hàng theo ngày</p>
+          {dailyOrdersData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={256}>
+              <LineChart data={dailyOrdersData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="orders" 
+                  stroke="#3b82f6" 
+                  strokeWidth={2}
+                  name="Đơn hàng"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Chưa có dữ liệu</p>
+              </div>
             </div>
-          </div>
+          )}
         </ChartCard>
       </div>
 
@@ -246,25 +338,73 @@ const AdminAnalytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <ChartCard title="Hiệu suất trang web">
           <div className="space-y-4">
-            <div className="text-center py-8 text-gray-500">
-              Dữ liệu hiệu suất trang web sẽ được hiển thị khi có đủ dữ liệu
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Tỷ lệ chuyển đổi</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.conversionRate}%</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Tổng đơn hàng</p>
+                <p className="text-2xl font-bold text-green-600">{stats.newOrders}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Khách hàng mới</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.newCustomers}</p>
+              </div>
             </div>
           </div>
         </ChartCard>
 
         <ChartCard title="Phân bố đơn hàng">
-          <div className="space-y-3">
+          {orderStatusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={orderStatusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {orderStatusData.map((entry, index) => {
+                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                  })}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
             <div className="text-center py-8 text-gray-500">
-              Dữ liệu phân bố đơn hàng sẽ được hiển thị khi có đủ dữ liệu
+              Chưa có dữ liệu
             </div>
-          </div>
+          )}
         </ChartCard>
 
         <ChartCard title="Xu hướng tìm kiếm">
           <div className="space-y-3">
-            <div className="text-center py-8 text-gray-500">
-              Dữ liệu xu hướng tìm kiếm sẽ được hiển thị khi có đủ dữ liệu
-            </div>
+            {topProducts && topProducts.length > 0 ? (
+              topProducts.slice(0, 5).map((product, index) => (
+                <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-500 mr-2">#{index + 1}</span>
+                    <p className="text-sm font-medium text-gray-900">{product.name}</p>
+                  </div>
+                  <p className="text-sm text-gray-600">{product.price?.toLocaleString()}đ</p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Chưa có dữ liệu
+              </div>
+            )}
           </div>
         </ChartCard>
       </div>

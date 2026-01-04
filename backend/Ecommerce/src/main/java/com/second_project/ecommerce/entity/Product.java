@@ -79,7 +79,7 @@ public class Product {
     private Integer soldCount = 0;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     private List<String> images = new ArrayList<>();
 
     @Column(nullable = false)

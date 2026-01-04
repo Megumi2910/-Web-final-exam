@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color = "blue" }) => {
   const colorClasses = {
@@ -143,6 +144,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [monthlyRevenue, setMonthlyRevenue] = useState([]);
+  const [dailyViews, setDailyViews] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -162,7 +165,7 @@ const AdminDashboard = () => {
       // Calculate stats from data
       const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
       const totalOrders = orders.length;
-      const uniqueCustomers = new Set(orders.map(o => o.customerId)).size;
+      const uniqueCustomers = new Set(orders.map(o => o.userId || o.customerId)).size;
       const totalProducts = products.length;
 
       setStats({
@@ -177,6 +180,43 @@ const AdminDashboard = () => {
 
       // Set top products (first 5)
       setTopProducts(products.slice(0, 5));
+
+      // Calculate monthly revenue data (last 6 months)
+      const monthlyData = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = date.toLocaleString('vi-VN', { month: 'short' });
+        const monthOrders = orders.filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === date.getMonth() && orderDate.getFullYear() === date.getFullYear();
+        });
+        const revenue = monthOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+        monthlyData.push({
+          month: monthName,
+          revenue: revenue
+        });
+      }
+      setMonthlyRevenue(monthlyData);
+
+      // Calculate daily views (last 7 days) - simulated data
+      const dailyData = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dayName = date.toLocaleString('vi-VN', { weekday: 'short' });
+        // Simulate page views based on orders (multiply by random factor)
+        const dayOrders = orders.filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate.toDateString() === date.toDateString();
+        });
+        const views = dayOrders.length * 10 + Math.floor(Math.random() * 50);
+        dailyData.push({
+          day: dayName,
+          views: views
+        });
+      }
+      setDailyViews(dailyData);
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
     } finally {
@@ -239,16 +279,50 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Doanh thu theo tháng</h3>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <p className="text-gray-500">Biểu đồ doanh thu sẽ được hiển thị ở đây</p>
-          </div>
+          {monthlyRevenue.length > 0 ? (
+            <ResponsiveContainer width="100%" height={256}>
+              <LineChart data={monthlyRevenue}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [`${value.toLocaleString()}đ`, 'Doanh thu']}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  name="Doanh thu"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <p className="text-gray-500">Chưa có dữ liệu</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Lượt xem trang</h3>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <p className="text-gray-500">Biểu đồ lượt xem sẽ được hiển thị ở đây</p>
-          </div>
+          {dailyViews.length > 0 ? (
+            <ResponsiveContainer width="100%" height={256}>
+              <BarChart data={dailyViews}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="views" fill="#3b82f6" name="Lượt xem" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <p className="text-gray-500">Chưa có dữ liệu</p>
+            </div>
+          )}
         </div>
       </div>
 

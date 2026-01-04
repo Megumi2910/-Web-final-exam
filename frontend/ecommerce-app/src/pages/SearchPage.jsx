@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, Star, SearchX } from 'lucide-react';
 import { Input, Button } from '../components/ui';
+import Toast from '../components/ui/Toast';
 import { ProductGrid } from '../components/product';
 import { productApi } from '../services/productApi';
 import { categoryApi } from '../services/categoryApi';
+import { cartApi } from '../services/cartApi';
+import { useAuth } from '../context/AuthContext';
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { isAuthenticated, isVerified } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -24,6 +29,8 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [totalElements, setTotalElements] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Get search query from URL on mount
   useEffect(() => {
@@ -158,10 +165,10 @@ const SearchPage = () => {
         }
       } else {
         // Fallback: if category not found in list, use slug/name matching
-        const categoryMatch = product.category === filters.category || 
-                             product.category?.toLowerCase() === filters.category.toLowerCase();
-        if (!categoryMatch) {
-          return false;
+      const categoryMatch = product.category === filters.category || 
+                           product.category?.toLowerCase() === filters.category.toLowerCase();
+      if (!categoryMatch) {
+        return false;
         }
       }
     }
@@ -224,9 +231,28 @@ const SearchPage = () => {
     });
   };
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    alert(`Đã thêm "${product.name}" vào giỏ hàng!`);
+  const handleAddToCart = async (product) => {
+    if (!isAuthenticated()) {
+      const currentPath = `/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+      navigate('/login', { state: { from: currentPath } });
+      return;
+    }
+
+    if (!isVerified()) {
+      alert('Vui lòng xác thực email để thêm sản phẩm vào giỏ hàng. Kiểm tra email của bạn để xác thực tài khoản.');
+      return;
+    }
+
+    try {
+      await cartApi.addToCart(product.id, 1);
+      setToastMessage('Đã thêm sản phẩm vào giỏ hàng!');
+      setShowToast(true);
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      setToastMessage(error.response?.data?.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+      setShowToast(true);
+    }
   };
 
   const handleToggleWishlist = (product) => {
@@ -248,6 +274,15 @@ const SearchPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Banner */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setShowToast(false)}
+          duration={2000}
+        />
+      )}
+
       {/* Search Header */}
       <div className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

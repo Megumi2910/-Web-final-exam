@@ -16,8 +16,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import lombok.EqualsAndHashCode;
@@ -63,16 +61,18 @@ public class Review {
     @NotNull
     private User user;
 
-    @Column(nullable = true)
-    @Min(value = 1, message = "Rating must be at least 1")
-    @Max(value = 5, message = "Rating must be at most 5")
-    private Integer rating; // 1-5 stars (nullable for admin/seller comments)
+    @Column(nullable = false)
+    @NotNull
+    private Integer rating; // 1-5 stars (required)
 
     @Column(columnDefinition = "TEXT")
     private String comment;
 
     @Column(nullable = false)
     private Boolean isVerifiedPurchase = false;
+
+    @Column(nullable = false)
+    private Integer editCount = 0; // Track number of times review has been edited (max 1)
 
     @Column(nullable = false)
     @NotNull

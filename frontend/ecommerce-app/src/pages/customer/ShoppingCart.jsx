@@ -49,12 +49,13 @@ const ShoppingCart = () => {
         cart.items?.forEach(item => {
           // CartItemDto has flattened product fields
           const sellerId = item.sellerId || 0;
-          const sellerName = item.sellerName || 'Shop';
+          // Use storeName if available, otherwise fallback to sellerName, then 'Shop'
+          const shopName = item.storeName || item.sellerName || 'Shop';
           
           if (!itemsBySeller[sellerId]) {
             itemsBySeller[sellerId] = {
               shopId: sellerId,
-              shopName: sellerName,
+              shopName: shopName,
               products: []
             };
           }
