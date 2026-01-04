@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cartApi } from '../../services/cartApi';
 import { 
@@ -16,7 +16,8 @@ import {
   Gift,
   Star,
   Settings,
-  Store
+  Store,
+  LayoutDashboard
 } from 'lucide-react';
 
 const Button = ({ children, variant = "default", className = "", onClick, type }) => {
@@ -50,6 +51,7 @@ const Input = ({ className = "", value, onChange, onFocus, onBlur, onKeyPress, p
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout, user, isAuthenticated, hasRole } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
@@ -334,16 +336,28 @@ const Header = () => {
 
                   {isUserMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                      {location.pathname !== '/seller/profile' && (
+                        <Link
+                          to={hasRole('ADMIN') ? '/admin/profile' : hasRole('SELLER') ? '/seller/profile' : '/customer/profile'}
+                          className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <User className="w-4 h-4" />
+                          <span className="text-sm">Tài khoản của tôi</span>
+                        </Link>
+                      )}
+                      {hasRole('ADMIN') && (
+                        <Link
+                          to="/admin"
+                          className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          <span className="text-sm">Admin Dashboard</span>
+                        </Link>
+                      )}
                       <Link
-                        to={hasRole('ADMIN') ? "/admin/settings#profile" : "/customer/profile"}
-                        className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        onClick={() => setIsUserMenuOpen(false)}
-                      >
-                        <User className="w-4 h-4" />
-                        <span className="text-sm">Tài khoản của tôi</span>
-                      </Link>
-                      <Link
-                        to={hasRole('ADMIN') ? "/admin/settings" : "/customer/settings"}
+                        to={hasRole('ADMIN') ? "/admin/settings" : hasRole('SELLER') ? "/seller/settings" : "/customer/settings"}
                         className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
@@ -462,10 +476,24 @@ const Header = () => {
               <div className="space-y-2">
                 {isAuthenticated() ? (
                   <>
-                    <Link to="/customer/profile" className="flex items-center space-x-2 py-2 text-white bg-orange-600 hover:bg-orange-700 px-3 rounded-lg w-full text-left font-medium">
-                      <User className="w-4 h-4" />
-                      <span>Tài khoản của tôi</span>
-                    </Link>
+                    {location.pathname !== '/seller/profile' && (
+                      <Link 
+                        to={hasRole('ADMIN') ? '/admin/profile' : hasRole('SELLER') ? '/seller/profile' : '/customer/profile'} 
+                        className="flex items-center space-x-2 py-2 text-white bg-orange-600 hover:bg-orange-700 px-3 rounded-lg w-full text-left font-medium"
+                      >
+                        <User className="w-4 h-4" />
+                        <span>Tài khoản của tôi</span>
+                      </Link>
+                    )}
+                    {hasRole('ADMIN') && (
+                      <Link 
+                        to="/admin" 
+                        className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        <span>Admin Dashboard</span>
+                      </Link>
+                    )}
                     <Link to="/orders" className="flex items-center space-x-2 py-2 text-gray-700 hover:text-orange-600 w-full text-left">
                       <ShoppingCart className="w-4 h-4" />
                       <span>Đơn hàng của tôi</span>

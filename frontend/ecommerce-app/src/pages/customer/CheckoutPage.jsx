@@ -14,6 +14,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { orderApi } from '../../services/orderApi';
+import { userApi } from '../../services/userApi';
 
 const CheckoutPage = () => {
   const location = useLocation();
@@ -27,17 +28,39 @@ const CheckoutPage = () => {
   // Lấy data từ router state (từ giỏ hàng)
   const checkoutData = location.state;
   
-  // Initialize with user info if available
+  // Fetch user profile to get latest address and phone number
   useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await userApi.getProfile();
+        if (response.data.success) {
+          const userData = response.data.data;
+          // Set default address from user profile
+          if (userData.address) {
+            setShippingAddress(userData.address);
+          }
+          // Set default phone number from user profile
+          if (userData.phoneNumber) {
+            setPhoneNumber(userData.phoneNumber);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        // Fallback to auth context user data if API call fails
+        if (user) {
+          if (user.address) {
+            setShippingAddress(user.address);
+          }
+          if (user.phoneNumber) {
+            setPhoneNumber(user.phoneNumber);
+          }
+        }
+      }
+    };
+
+    // Only fetch if user is authenticated
     if (user) {
-      // Set default address from user profile
-      if (user.address) {
-        setShippingAddress(user.address);
-      }
-      // Set default phone number from user profile
-      if (user.phoneNumber) {
-        setPhoneNumber(user.phoneNumber);
-      }
+      fetchUserProfile();
     }
   }, [user]);
 

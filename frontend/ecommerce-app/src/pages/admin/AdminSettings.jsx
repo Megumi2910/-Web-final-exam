@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon,
   Save,
@@ -9,10 +9,9 @@ import {
   Palette,
   Database,
   Globe,
-  User,
-  Store
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
-import ProfileSettings from '../../components/settings/ProfileSettings';
 
 const SettingSection = ({ title, icon: Icon, children }) => {
   return (
@@ -28,19 +27,31 @@ const SettingSection = ({ title, icon: Icon, children }) => {
 
 const AdminSettings = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('system');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Handle hash navigation (e.g., /admin/settings#profile)
+  // Redirect to customer profile if trying to access profile tab
   useEffect(() => {
     if (location.hash === '#profile') {
-      setActiveTab('profile');
-      // Scroll to top of content area
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (location.hash === '#system') {
-      setActiveTab('system');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      navigate('/customer/profile');
     }
-  }, [location.hash]);
+  }, [location.hash, navigate]);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('adminSystemSettings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(prev => ({ ...prev, ...parsed }));
+      } catch (error) {
+        console.error('Failed to load saved settings:', error);
+      }
+    }
+  }, []);
+
   const [settings, setSettings] = useState({
     siteName: 'CNVLTW',
     siteDescription: 'Cửa hàng thương mại điện tử hàng đầu',
@@ -69,10 +80,24 @@ const AdminSettings = () => {
     }
   });
 
-  const handleSave = () => {
-    console.log('Saving system settings:', settings);
-    // Here you would typically save to backend
-    alert('Cài đặt hệ thống đã được lưu thành công!');
+  const handleSave = async () => {
+    setMessage({ type: '', text: '' });
+    setLoading(true);
+    try {
+      // Save to localStorage for demonstration
+      localStorage.setItem('adminSystemSettings', JSON.stringify(settings));
+      setMessage({ type: 'success', text: 'Cài đặt hệ thống đã được lưu thành công!' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      setMessage({ type: 'error', text: 'Lưu cài đặt thất bại. Vui lòng thử lại.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (section, field, value) => {
@@ -93,8 +118,7 @@ const AdminSettings = () => {
   };
 
   const tabs = [
-    { id: 'system', label: 'Hệ thống', icon: SettingsIcon },
-    { id: 'profile', label: 'Hồ sơ', icon: User }
+    { id: 'system', label: 'Hệ thống', icon: SettingsIcon }
   ];
 
   const renderSystemTab = () => (
@@ -107,12 +131,29 @@ const AdminSettings = () => {
         </div>
         <button
           onClick={handleSave}
-          className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
+          disabled={loading}
+          className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save className="w-4 h-4" />
-          <span>Lưu cài đặt</span>
+          <span>{loading ? 'Đang lưu...' : 'Lưu cài đặt'}</span>
         </button>
       </div>
+
+      {/* Success/Error Message */}
+      {message.text && (
+        <div className={`p-4 rounded-lg flex items-center space-x-2 ${
+          message.type === 'success' 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {message.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span>{message.text}</span>
+        </div>
+      )}
 
       {/* General Settings */}
       <SettingSection title="Cài đặt chung" icon={SettingsIcon}>
@@ -224,7 +265,12 @@ const AdminSettings = () => {
               <input
                 type="checkbox"
                 checked={settings.notifications.email}
-                onChange={(e) => handleInputChange('notifications', 'email', e.target.checked)}
+                onChange={(e) => {
+                  handleInputChange('notifications', 'email', e.target.checked);
+                  // Auto-save notifications to localStorage
+                  const updatedSettings = { ...settings, notifications: { ...settings.notifications, email: e.target.checked } };
+                  localStorage.setItem('adminSystemSettings', JSON.stringify(updatedSettings));
+                }}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
@@ -240,7 +286,12 @@ const AdminSettings = () => {
               <input
                 type="checkbox"
                 checked={settings.notifications.sms}
-                onChange={(e) => handleInputChange('notifications', 'sms', e.target.checked)}
+                onChange={(e) => {
+                  handleInputChange('notifications', 'sms', e.target.checked);
+                  // Auto-save notifications to localStorage
+                  const updatedSettings = { ...settings, notifications: { ...settings.notifications, sms: e.target.checked } };
+                  localStorage.setItem('adminSystemSettings', JSON.stringify(updatedSettings));
+                }}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
@@ -256,7 +307,12 @@ const AdminSettings = () => {
               <input
                 type="checkbox"
                 checked={settings.notifications.push}
-                onChange={(e) => handleInputChange('notifications', 'push', e.target.checked)}
+                onChange={(e) => {
+                  handleInputChange('notifications', 'push', e.target.checked);
+                  // Auto-save notifications to localStorage
+                  const updatedSettings = { ...settings, notifications: { ...settings.notifications, push: e.target.checked } };
+                  localStorage.setItem('adminSystemSettings', JSON.stringify(updatedSettings));
+                }}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
@@ -401,12 +457,6 @@ const AdminSettings = () => {
     </div>
   );
 
-  // Shop tab removed - admin will access shop settings via /seller route
-
-  const renderProfileTab = () => (
-    <ProfileSettings showAddress={false} />
-  );
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -447,7 +497,6 @@ const AdminSettings = () => {
             {/* Content */}
             <div className="flex-1 p-6 lg:p-8">
               {activeTab === 'system' && renderSystemTab()}
-              {activeTab === 'profile' && renderProfileTab()}
             </div>
           </div>
         </div>

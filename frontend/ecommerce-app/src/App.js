@@ -111,9 +111,24 @@ function App() {
           <Route path="settings" element={<CustomerSettings />} />
         </Route>
         
-        {/* Customer profile - also accessible to ADMIN and SELLER (for viewing their own profile) */}
+        {/* Profile page - accessible to all authenticated users (CUSTOMER, SELLER, ADMIN) */}
+        {/* All users can access /customer/profile */}
         <Route path="/customer/profile" element={
-          <ProtectedRoute allowedRoles={['ADMIN', 'SELLER']}>
+          <ProtectedRoute allowedRoles={['CUSTOMER', 'SELLER', 'ADMIN']}>
+            <Layout><CustomerProfile /></Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Seller profile - same component, accessible through seller route */}
+        <Route path="/seller/profile" element={
+          <ProtectedRoute allowedRoles={['SELLER', 'ADMIN']}>
+            <Layout><CustomerProfile /></Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Admin profile - same component, accessible through admin route */}
+        <Route path="/admin/profile" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
             <Layout><CustomerProfile /></Layout>
           </ProtectedRoute>
         } />

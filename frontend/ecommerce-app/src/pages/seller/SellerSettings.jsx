@@ -5,10 +5,12 @@ import {
   Store,
   Save,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  User
 } from 'lucide-react';
 import { sellerApi } from '../../services/sellerApi';
 import { useAuth } from '../../context/AuthContext';
+import ProfileSettings from '../../components/settings/ProfileSettings';
 
 const SettingSection = ({ title, icon: Icon, children }) => {
   return (
@@ -63,6 +65,7 @@ const SellerSettings = () => {
 
   const tabs = [
     { id: 'shop', label: 'Cửa hàng', icon: Store },
+    { id: 'profile', label: 'Hồ sơ', icon: User },
     { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'payment', label: 'Thanh toán', icon: CreditCard }
   ];
@@ -287,6 +290,10 @@ const SellerSettings = () => {
     </div>
   );
 
+  const renderProfileTab = () => (
+    <ProfileSettings showAddress={true} />
+  );
+
   const renderPaymentTab = () => (
     <div className="space-y-6">
       <SettingSection title="Thanh toán" icon={CreditCard}>
@@ -382,6 +389,7 @@ const SellerSettings = () => {
             {/* Content */}
             <div className="flex-1 p-6 lg:p-8">
               {activeTab === 'shop' && renderShopTab()}
+              {activeTab === 'profile' && renderProfileTab()}
               {activeTab === 'notifications' && renderNotificationsTab()}
               {activeTab === 'payment' && renderPaymentTab()}
             </div>

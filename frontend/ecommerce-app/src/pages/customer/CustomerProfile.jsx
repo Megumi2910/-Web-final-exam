@@ -41,10 +41,16 @@ const CustomerProfile = () => {
     phoneNumber: '',
     address: ''
   });
+  const [profilePicture, setProfilePicture] = useState(null);
 
   useEffect(() => {
     fetchProfile();
     fetchOrderStatistics();
+    // Load profile picture from localStorage
+    const savedPicture = localStorage.getItem(`profilePicture_${authUser?.userId}`);
+    if (savedPicture) {
+      setProfilePicture(savedPicture);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -205,6 +211,35 @@ const CustomerProfile = () => {
     }
   };
 
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file ảnh (PNG, JPG, JPEG)');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Kích thước file không được vượt quá 2MB');
+      return;
+    }
+
+    // Read file as base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result;
+      setProfilePicture(base64String);
+      // Save to localStorage
+      if (authUser?.userId) {
+        localStorage.setItem(`profilePicture_${authUser.userId}`, base64String);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCancel = () => {
     // Reset form data to original values
     if (profileData) {
@@ -331,12 +366,26 @@ const CustomerProfile = () => {
                   {/* Avatar Section */}
                   <div className="flex flex-col items-center space-y-4">
                     <div className="relative">
-                      <div className="w-32 h-32 bg-gradient-to-br from-shopee-orange to-orange-600 rounded-full flex items-center justify-center text-white text-4xl font-bold">
-                        {displayInitial}
-                      </div>
-                      <button className="absolute bottom-0 right-0 w-10 h-10 bg-white rounded-full shopee-shadow flex items-center justify-center text-shopee-orange hover:bg-gray-50 transition-colors">
+                      {profilePicture ? (
+                        <img
+                          src={profilePicture}
+                          alt="Profile"
+                          className="w-32 h-32 rounded-full object-cover border-4 border-white shopee-shadow"
+                        />
+                      ) : (
+                        <div className="w-32 h-32 bg-gradient-to-br from-shopee-orange to-orange-600 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+                          {displayInitial}
+                        </div>
+                      )}
+                      <label className="absolute bottom-0 right-0 w-10 h-10 bg-white rounded-full shopee-shadow flex items-center justify-center text-shopee-orange hover:bg-gray-50 transition-colors cursor-pointer">
                         <Camera className="w-5 h-5" />
-                      </button>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg"
+                          onChange={handleProfilePictureChange}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
                     <div className="text-center">
                       <div className="font-medium text-gray-900">{fullName}</div>

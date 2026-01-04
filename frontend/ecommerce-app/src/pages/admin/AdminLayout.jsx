@@ -198,12 +198,14 @@ const AdminLayout = () => {
                 {showProfileMenu && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                         <Link
-                      to="/admin/settings#profile"
+                      to={location.pathname === '/admin/profile' ? '/admin' : '/admin/profile'}
                       className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                           onClick={() => setShowProfileMenu(false)}
                         >
                       <User className="w-4 h-4" />
-                      <span className="text-sm">Tài khoản của tôi</span>
+                      <span className="text-sm">
+                        {location.pathname === '/admin/profile' ? 'Admin Dashboard' : 'Tài khoản của tôi'}
+                      </span>
                         </Link>
                         <Link
                           to="/admin/settings"
